@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 import telebot
+import os
 from telebot import types
 import config
 import requests
@@ -39,11 +40,17 @@ def question_handler(message):
     bot.send_chat_action(message.chat.id, 'typing')
     bot.send_message(message.chat.id, "Спрашивайте, пожалуйста 🦊"
                                       "\nВаш вопрос будет обсужден на семинаре.\n"
-                                      "Внимание: все нижесказанное cообщение будет воспринято как вопрос к семинаристу.")
+                                      "Внимание: все нижесказанное cообщение (одно) будет воспринято как вопрос к семинаристу.")
 # Сдать домашку
 @bot.message_handler(func=lambda msg: msg.text == '🐌 Сдать домашку 🐌', content_types=['text'])
 def hw_handler(message):
     bot.send_chat_action(message.chat.id, 'typing')
+    sqlbd = SQLighter(config.bd_name)
+    if not sqlbd.is_registered(message.from_user.id):
+        sqlbd.close()
+        bot.send_message(message.chat.id, "Прежде чем сдавать домашку, зарегайтесь, пожалуйста.\n"
+                                          "Для этого достаточно нажать на кнопочку '🐸 Зарегаться 🐸'", reply_markup=markup_main)
+        return
     bot.send_message(message.chat.id, "Пожалуйста выберите из списка доступных для сдачи заданий:",
                      reply_markup=markup_hw)
 
@@ -64,10 +71,16 @@ def register_handler(message):
     bot.send_message(message.chat.id, "В следующем сообщении напишите как вас называть. 🐝\n"
                                       "Это имя будет использовано для дальнейшей идентификации вас при проверке дз.\n"
                                       "Оно также будет привязано к вашему телеграм-аккаунту 🌚\n"
-                                      "__Внимание!__ В дальнейшем изменить ваше имя будет невозможно 🐙")
+                                      "Внимание! В дальнейшем изменить ваше имя будет невозможно 🐙")
 # hw -- выбор домашки
 @bot.message_handler(func=lambda msg: msg.text in config.possible_to_pass, content_types=['text'])
 def hw_saver(message):
+    sqlbd = SQLighter(config.bd_name)
+    if not sqlbd.is_registered(message.from_user.id):
+        sqlbd.close()
+        bot.send_message(message.chat.id, "Прежде чем сдавать домашку, зарегайтесь, пожалуйста.\n"
+                                          "Для этого достаточно нажать на кнопочку '🐸 Зарегаться 🐸'", reply_markup=markup_main)
+        return
     FLAGS['hw'] = message.text
     bot.send_chat_action(message.chat.id, 'typing')
     bot.send_message(message.chat.id, "Пришлите файл (один архив или один Jupyter notebook) весом не более 20 Мб 🦋",
@@ -77,8 +90,23 @@ def hw_saver(message):
 @bot.message_handler(func=lambda msg: FLAGS['hw'] is not None, content_types=['document'])
 def handle_docs(message):
     bot.send_chat_action(message.chat.id, 'typing')
+    # print(message)
+    file_id = message.document.file_id
     sqlbd = SQLighter(config.bd_name)
-    
+    sqlbd.add_homework(message.from_user.id, FLAGS['hw'], file_id=file_id)
+    folder_name = os.path.join(config.SAVE_PATH, str(message.from_user.id))
+
+    # saving to folder:
+    if not os.path.exists(folder_name):
+        os.mkdir(folder_name)
+    file_info = bot.get_file(file_id)
+    print(file_info.file_path)
+    file = requests.get('https://api.telegram.org/file/bot{0}/{1}'.format(config.token, file_info.file_path), stream=True)
+    local_filename = os.path.join(folder_name, FLAGS['hw']+'_'+message.document.file_name)
+    with open(local_filename, 'wb') as f:
+        for chunk in file.iter_content(chunk_size=1024):
+            if chunk: # filter out keep-alive new chunks
+                f.write(chunk)
     bot.send_message(message.chat.id, "Ваш файлик был заботливо сохранен как задание {} 🐾".format(FLAGS['hw']),
                      reply_markup=markup_hw)
     FLAGS['hw'] = None
@@ -95,6 +123,7 @@ def register_saver(message):
     sqlbd.close()
     bot.send_message(message.chat.id, "Спасибо! Теперь вы зарегистрированы в системе как {}".format(message.text),
                      reply_markup=markup_main)
+
 
 # Сохранение вопроса к семинару
 @bot.message_handler(func=lambda msg: FLAGS['question'], content_types=['text'])

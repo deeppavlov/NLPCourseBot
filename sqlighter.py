@@ -14,11 +14,10 @@ class SQLighter:
         with self.connection:
             return len(self.cursor.execute("SELECT * FROM Registration WHERE user_id = ?", (user_id,)).fetchall()) > 0
 
-    def add_homework(self, user_id, hw_num):
-        """ Register user in bd """
+    def add_homework(self, user_id, hw_num, file_id):
+        """ Add hw """
         with self.connection:
-            return self.cursor.execute("INSERT INTO hw (user_id, {})"
-                                       " VALUES (?, 1)".format(hw_num), (user_id,))
+            return self.cursor.execute("UPDATE hw SET {} = ? WHERE  user_id = ?".format(hw_num), (file_id, user_id))
 
     def get_user_name(self, user_id):
         """ Get user name """
@@ -29,6 +28,7 @@ class SQLighter:
     def register(self, user_id, user_name):
         """ Register user in bd """
         with self.connection:
+            self.cursor.execute("INSERT INTO hw (user_id) VALUES (?)", (user_id,))
             return self.cursor.execute("INSERT INTO Registration (user_id, user_name)"
                                        " VALUES (?, ?)", (user_id, user_name))
 
@@ -75,4 +75,6 @@ if __name__ == '__main__':
     # print(sql.select_all(12))
     # print(sql.select_last_n_days(13, 3))
     print(sql.is_registered(61023330))
-    print(sql.get_user_name(61023330))
+    # print(sql.get_user_name(61023330))
+    # print(sql.register(61023330, "DFGD"))
+    print(sql.add_homework(61023330, 'Sem1'))

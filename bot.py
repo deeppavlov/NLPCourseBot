@@ -4,6 +4,7 @@ from telebot import types
 import config
 from sqlighter import SQLighter
 from collections import defaultdict
+import cherrypy
 
 bot = telebot.TeleBot(config.token)
 
@@ -214,4 +215,49 @@ def make_hw_keyboard(course):
 
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True)
+    if config.WEBHOOKS_AVAIL:
+
+        WEBHOOK_HOST = config.WEBHOOK_HOST
+        WEBHOOK_PORT = config.WEBHOOK_PORT
+        WEBHOOK_LISTEN = config.WEBHOOK_LISTEN
+
+        WEBHOOK_SSL_CERT = config.WEBHOOK_SSL_CERT  ## sertificat path
+        WEBHOOK_SSL_PRIV = config.WEBHOOK_SSL_PRIV  ## private key path
+
+        WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
+        WEBHOOK_URL_PATH = "/%s/" % config.token
+
+
+        class WebhookServer(object):
+            @cherrypy.expose
+            def index(self):
+                if 'content-length' in cherrypy.request.headers and \
+                                'content-type' in cherrypy.request.headers and \
+                                cherrypy.request.headers['content-type'] == 'application/json':
+                    length = int(cherrypy.request.headers['content-length'])
+                    json_string = cherrypy.request.body.read(length).decode("utf-8")
+                    update = telebot.types.Update.de_json(json_string)
+                    bot.process_new_updates([update])
+                    return ''
+                else:
+                    raise cherrypy.HTTPError(403)
+
+
+        bot.remove_webhook()
+
+        bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
+                        certificate=open(WEBHOOK_SSL_CERT, 'r'))
+
+        cherrypy.config.update({
+            'server.socket_host': WEBHOOK_LISTEN,
+            'server.socket_port': WEBHOOK_PORT,
+            'server.ssl_module': 'builtin',
+            'server.ssl_certificate': WEBHOOK_SSL_CERT,
+            'server.ssl_private_key': WEBHOOK_SSL_PRIV
+        })
+
+        cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
+
+    else:
+        bot.delete_webhook()
+        bot.polling(none_stop=True)

@@ -5,8 +5,10 @@ import config
 from sqlighter import SQLighter
 from collections import defaultdict
 import cherrypy
+import os
 
-bot = telebot.TeleBot(config.token)
+token = os.environ['TOKEN']
+bot = telebot.TeleBot(token)
 
 markup_cleared = types.ReplyKeyboardRemove()
 
@@ -225,7 +227,7 @@ if __name__ == '__main__':
         WEBHOOK_SSL_PRIV = config.WEBHOOK_SSL_PRIV  ## private key path
 
         WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-        WEBHOOK_URL_PATH = "/%s/" % config.token
+        WEBHOOK_URL_PATH = "/%s/" % token
 
 
         class WebhookServer(object):

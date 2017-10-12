@@ -9,72 +9,51 @@ class SQLighter:
         self.connection = sqlite3.connect(database)
         self.cursor = self.connection.cursor()
 
-    def is_registered(self, user_id):
-        """ Check if user registered """
-        with self.connection:
-            return len(self.cursor.execute("SELECT * FROM Registration WHERE user_id = ?", (user_id,)).fetchall()) > 0
+    # def check_hw_date(self, user_id, hw_num, course):
+    #     """ Check if that hw_num is exists for user_id """
+    #     with self.connection:
+    #         return self.cursor.execute("SELECT datetime(date, 'unixepoch') FROM hw WHERE (user_id = ?) AND (hw_num = ?) AND (course = ?)",
+    #                                    (user_id, hw_num, course)).fetchall()
 
-    def add_homework(self, user_id, hw_num, file_id):
-        """ Add hw """
+    def is_exists_hw(self, user_id, hw_num, course):
+        """ Check if that hw_num is exists for user_id """
         with self.connection:
-            return self.cursor.execute("UPDATE hw SET {} = ? WHERE  user_id = ?".format(hw_num), (file_id, user_id))
+            return len(self.cursor.execute("SELECT * FROM hw WHERE (user_id = ?) AND (hw_num = ?) AND (course = ?)",
+                                       (user_id, hw_num, course)).fetchall()) > 0
 
-    def get_user_name(self, user_id):
-        """ Get user name """
+    def upd_homework(self, user_id, hw_num, course, file_id):
+        """ UPD hw """
         with self.connection:
-            return \
-            self.cursor.execute("SELECT user_name FROM Registration WHERE user_id = ?", (user_id,)).fetchall()[0][0]
+            return self.cursor.execute(
+                "UPDATE hw SET file_id = ?, date = strftime('%s','now') WHERE (user_id = ?) AND (hw_num = ?) AND (course = ?)",
+                (file_id, user_id, hw_num, course))
 
-    def register(self, user_id, user_name):
-        """ Register user in bd """
+    def add_homework(self, user_id, hw_num, course, file_id):
+        """ ADD hw """
         with self.connection:
-            self.cursor.execute("INSERT INTO hw (user_id) VALUES (?)", (user_id,))
-            return self.cursor.execute("INSERT INTO Registration (user_id, user_name)"
-                                       " VALUES (?, ?)", (user_id, user_name))
+            return self.cursor.execute(
+                "INSERT INTO hw (file_id, user_id, hw_num, course, date) VALUES (?, ?, ?, ?, strftime('%s','now'))",
+                (file_id, user_id, hw_num, course))
 
-    def select_all_for_this_week(self):
-        """ Get all questions for the current week """
-        with self.connection:
-            return self.cursor.execute("SELECT * FROM Questions WHERE date_added >= date('now','-5 day')").fetchall()
-
-    def select_all_for_users(self, user_id):
-        """ Get all questions from that user """
-        with self.connection:
-            return self.cursor.execute('SELECT * FROM Questions WHERE user_id = ?', (user_id,)).fetchall()
-
-    def select_last_n_days(self, user_id, n):
+    def select_questions_last_n_days(self, course, n_days):
         """ Get only fresh questions from last n days """
         with self.connection:
-            return self.cursor.execute("SELECT * FROM Questions WHERE (user_id = ?) AND "
-                                       "(date_added >= date('now','-{} day'))".format(n), (user_id,)).fetchall()
+            return self.cursor.execute("SELECT question FROM Questions WHERE (course = ?) AND "
+                                       "(date_added >= strftime('%s','now','-{} day'))".format(n_days),
+                                       (course,)).fetchall()
 
-    def count_users_questions(self, user_id):
-        """ Get number of user's questions """
-        with self.connection:
-            result = self.cursor.execute('SELECT * FROM Questions WHERE user_id = ?', (user_id,)).fetchall()
-            return len(result)
-
-    def write_question(self, user_id, question):
+    def write_question(self, user_id, question, course):
         """ Insert question into BD """
         with self.connection:
-            return self.cursor.execute("INSERT INTO Questions (user_id, question, date_added)"
-                                       " VALUES (?, ?, date('now'))", (user_id, question))
-
-    def close(self):
-        """ Close current connection with DB """
-        self.connection.close()
-
+            return self.cursor.execute("INSERT INTO Questions (user_id, question, course, date_added)"
+                                       " VALUES (?, ?, ?, strftime('%s','now'))", (user_id, question, course))
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    # sql.write_question(12, "Lolol")
-    # sql.write_question(13, "Lolorel")
-    # sql.write_question(14, "Lololdfg")
-    # sql.write_question(12, "Lolol43")
-    # print(sql.count_rows(12))
-    # print(sql.select_all(12))
-    # print(sql.select_last_n_days(13, 3))
-    print(sql.is_registered(61023330))
-    # print(sql.get_user_name(61023330))
-    # print(sql.register(61023330, "DFGD"))
-    print(sql.add_homework(61023330, 'Sem1'))
+    print(sql.is_exists_hw(232, 'sem2', 'NLP'))
+    sql.add_homework(232, 'sem2', 'NLP', 'dfgsdfe54df')
+    print(sql.is_exists_hw(232, 'sem2', 'NLP'))
+    sql.upd_homework(232, 'sem2', 'NLP', 'ersSDFgsresrEr34')
+    print(sql.is_exists_hw(232, 'sem2', 'NLP'))
+    sql.write_question(34, 'sdfgserge dfgs', 'NLP')
+    print(sql.select_questions_last_n_days('NLP', 3))

@@ -2,7 +2,7 @@
 import telebot
 from telebot import types
 import config
-# from sqlighter import SQLighter
+from sqlighter import SQLighter
 from collections import defaultdict
 
 bot = telebot.TeleBot(config.token)
@@ -25,11 +25,6 @@ markup_hw_q.row('🦉 Задать вопрос к семинару 🦉')
 markup_hw_q.row('🐌 Сдать домашку 🐌')
 markup_hw_q.row('Вернуться в начало')
 
-markup_hw = types.ReplyKeyboardMarkup(resize_keyboard=True)
-for name in config.possible_to_pass:
-    markup_hw.row(name)
-markup_hw.row('Вернуться назад')
-
 states = defaultdict(dict)
 
 
@@ -51,9 +46,9 @@ def handler(message):
         default_callback(message, states)
 
     elif (states[chat_id]['currentState'] == 'COURSE_SELECTION') and (message.text in ['🐟 RL 🐟', '🐸 NLP 🐸']):
-        choose_question_or_hw(message)
         states[chat_id]['currentState'] = 'HW_OR_QUESTION_SELECTION'
         states[chat_id]['course'] = message.text.split()[1]
+        choose_question_or_hw(message)
 
     elif (states[chat_id]['currentState'] == 'HW_OR_QUESTION_SELECTION') and \
             (message.text in ['🦉 Задать вопрос к семинару 🦉', '🐌 Сдать домашку 🐌']):
@@ -73,11 +68,11 @@ def handler(message):
         elif message.text == 'Задать еще один вопрос':
             question_handler(message)
         else:
-            question_saver(message)
+            question_saver(message, course=states[chat_id]['course'])
 
     elif (states[chat_id]['currentState'] == 'HW_NUM_SELECTION') and (message.content_type == 'text') and \
-            ((message.text in config.possible_to_pass) or (message.text == 'Вернуться назад')):
-        if message.text in config.possible_to_pass:
+            ((message.text in config.possible_to_pass[states[chat_id]['course']]) or (message.text == 'Вернуться назад')):
+        if message.text in config.possible_to_pass[states[chat_id]['course']]:
             states[chat_id]['currentState'] = 'IN_HW_UPLOAD'
             states[chat_id]['hw_num'] = message.text
             hw_waiter(message)
@@ -85,7 +80,7 @@ def handler(message):
             states[chat_id]['currentState'] = 'HW_OR_QUESTION_SELECTION'
             choose_question_or_hw(message)
 
-    elif (states[chat_id]['currentState'] == 'IN_HW_UPLOAD') and\
+    elif (states[chat_id]['currentState'] == 'IN_HW_UPLOAD') and \
             ((message.content_type in ['document', 'photo']) or message.text == 'Вернуться назад'):
         if message.text == 'Вернуться назад':
             states[chat_id]['currentState'] = 'HW_NUM_SELECTION'
@@ -149,6 +144,7 @@ def question_handler(message):
 
 # Сдать домашку
 def hw_handler(message):
+    markup_hw = make_hw_keyboard(states[message.chat.id]['course'])
     bot.send_message(message.chat.id, 'Пожалуйста, выберите из списка доступных для сдачи заданий.',
                      reply_markup=markup_hw)
 
@@ -170,24 +166,34 @@ def hw_saver(message, states):
                          .format(username.title(), str(config.available_hw_resolutions)))
         return
 
-    hw_num = states[message.chat.id]['hw_num']
-    filename = message.document.file_name
-
-    if not filename.endswith(config.available_hw_resolutions):
+    if not message.document.file_name.endswith(config.available_hw_resolutions):
         bot.send_message(message.chat.id, "🚫 {}, очень жаль но файлик не сдается в нашу систему...\n"
                                           "Наши преподаватели предпочитают следующие расширения: {}.\n"
                                           "Напоминаю, что дз сдается в виде одного файла архива или одного Jupyter ноутбука."
                          .format(username.title(), str(config.available_hw_resolutions)))
         return
 
-    bot.send_message(message.chat.id, 'Уважаемый *{}*, ваш файлик был заботливо сохранен как задание {} 🐾\n'
+    hw_num = states[message.chat.id]['hw_num']
+    course = states[message.chat.id]['course']
+    markup_hw = make_hw_keyboard(course)
+    sqldb = SQLighter(config.bd_name)
+    if sqldb.is_exists_hw(user_id=username, hw_num=hw_num, course=course):
+        sqldb.upd_homework(user_id=username, hw_num=hw_num, course=course, file_id=message.document.file_id)
+        bot.send_message(message.chat.id, 'Уважаемый *{}*, ваше задание {} было обновлено. Хорошего дня:) 🐾\n'
+                         .format(username.title(), hw_num),
+                         reply_markup=markup_hw, parse_mode='Markdown')
+    else:
+        sqldb.add_homework(user_id=username, hw_num=hw_num, course=course, file_id=message.document.file_id)
+        bot.send_message(message.chat.id, 'Уважаемый *{}*, ваш файлик был заботливо сохранен как задание {} 🐾\n'
                      .format(username.title(), hw_num),
                      reply_markup=markup_hw, parse_mode='Markdown')
-    clear_state(message, states, set_state='HW_NUM_SELECTION')
-
+    states[message.chat.id]['currentState'] = 'HW_NUM_SELECTION'
+    states[message.chat.id]['hw_num'] = None
 
 # Сохранение вопроса к семинару
-def question_saver(message):
+def question_saver(message, course):
+    sqldb = SQLighter(config.bd_name)
+    sqldb.write_question(user_id=message.chat.username, question=message.text, course=course)
     bot.send_message(message.chat.id, 'Спасибо за вопрос. Хорошего дня 🐯 :)\n'
                                       'Нажмите кнопку, если желаете задать еще один вопрос.',
                      reply_markup=markup_ask_again)
@@ -197,6 +203,14 @@ def bla_bla_detected(message):
     bot.send_message(message.chat.id, 'Я вас не понимаю.\n'
                                       'Нажмите /start чтобы начать жизнь с чистого листа ☘️',
                      reply_markup=markup_cleared)
+
+
+def make_hw_keyboard(course):
+    markup_hw = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    for name in config.possible_to_pass[course]:
+        markup_hw.row(name)
+    markup_hw.row('Вернуться назад')
+    return markup_hw
 
 
 if __name__ == '__main__':

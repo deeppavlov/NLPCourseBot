@@ -4,8 +4,9 @@ from telebot import types
 import config
 from sqlighter import SQLighter
 from collections import defaultdict
-import cherrypy
 import os
+from flask import Flask, request
+
 
 token = os.environ['TOKEN']
 bot = telebot.TeleBot(token)
@@ -220,46 +221,21 @@ if __name__ == '__main__':
     if config.WEBHOOKS_AVAIL:
 
         WEBHOOK_HOST = config.WEBHOOK_HOST
-        WEBHOOK_PORT = config.WEBHOOK_PORT
+        PORT = config.PORT
         WEBHOOK_LISTEN = config.WEBHOOK_LISTEN
 
-        WEBHOOK_SSL_CERT = config.WEBHOOK_SSL_CERT  ## sertificat path
-        WEBHOOK_SSL_PRIV = config.WEBHOOK_SSL_PRIV  ## private key path
-
-        WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-        WEBHOOK_URL_PATH = "/%s/" % token
+        server = Flask(__name__)
 
 
-        class WebhookServer(object):
-            @cherrypy.expose
-            def index(self):
-                if 'content-length' in cherrypy.request.headers and \
-                                'content-type' in cherrypy.request.headers and \
-                                cherrypy.request.headers['content-type'] == 'application/json':
-                    length = int(cherrypy.request.headers['content-length'])
-                    json_string = cherrypy.request.body.read(length).decode("utf-8")
-                    update = telebot.types.Update.de_json(json_string)
-                    bot.process_new_updates([update])
-                    return ''
-                else:
-                    raise cherrypy.HTTPError(403)
+        @server.route("/webhook", methods=['POST'])
+        def getMessage():
+            bot.process_new_updates([telebot.types.Update.de_json(request.stream.read().decode("utf-8"))])
+            return "!", 200
 
+        server.run(host=WEBHOOK_LISTEN, port=PORT)
 
         bot.remove_webhook()
-
-        bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH,
-                        certificate=open(WEBHOOK_SSL_CERT, 'r'))
-
-        cherrypy.config.update({
-            'server.socket_host': WEBHOOK_LISTEN,
-            'server.socket_port': WEBHOOK_PORT,
-            'server.ssl_module': 'builtin',
-            'server.ssl_certificate': WEBHOOK_SSL_CERT,
-            'server.ssl_private_key': WEBHOOK_SSL_PRIV
-        })
-
-        cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
-
+        bot.set_webhook(url=WEBHOOK_HOST)
     else:
         bot.delete_webhook()
         bot.polling(none_stop=True)

@@ -4,7 +4,7 @@ from telebot import types
 
 
 class State:
-    def __init__(self, name: str, welcome_msg: str, triggers_out: Dict, handler_spec=None, return_back_button=False):
+    def __init__(self, name: str, welcome_msg: str, triggers_out: Dict, parent_state=None, handler_spec=None, return_back_button=False):
         """
         :param name: name of state object;
         :param triggers_out: dict like {state_out1_name:{'phrase':'some_string',
@@ -15,6 +15,7 @@ class State:
         self.name = name
         self.welcome_msg = welcome_msg
         self.triggers_out = triggers_out
+        self.parent_state = parent_state
         self.handler_spec = handler_spec
         self.return_back_button = return_back_button
         self.reply_markup = self.make_reply_markup()
@@ -41,6 +42,7 @@ class State:
         """
         Default handler manage text messages and couldn't handle any photo/documents;
         It just apply special handler if it is not None;
+        If message couldn't be handled None is returned;
         :param message:
         :param usr_states:
         :return: name of the new state;
@@ -57,4 +59,22 @@ class State:
                         usr_states[chat_id][update_usr_state] = message.text
                     usr_states[chat_id]['current_state'] = state_name
                     return state_name
+        else:
+            return None
 
+
+class DialogGraph:
+    def __init__(self, bot, root_state:str, nodes: List[State]):
+        """
+        Instance of this class manages all the dialog flow;
+        :param bot: telebot.TeleBot(token);
+        :param nodes: list of instances of State class;
+        :param root_state: name of the root of dialog states.
+                            when new user appeared he/she has this state;
+        """
+        self.bot = bot
+        self.root_state = root_state
+        self.nodes = self.make_nodes_dict(nodes)
+
+    def make_nodes_dict(self, nodes):
+        return {state.name: state for state in nodes}

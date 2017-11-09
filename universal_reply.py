@@ -1,0 +1,2 @@
+RETURN_BACK_BUTTON = 'Вернуться назад'
+ADMIN_KEY_PHRASE = 'WINTERMUTE'

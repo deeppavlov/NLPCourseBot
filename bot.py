@@ -2,7 +2,7 @@
 import telebot
 from telebot import types
 import config
-from sqlighter import SQLighter
+from Sqlighter import SQLighter
 from collections import defaultdict
 import os
 from flask import Flask, request

@@ -13,8 +13,8 @@ class State:
                  return_back_button=False):
         """
         :param name: name of state object;
-        :param triggers_out: dict like {state_out1_name:{'phrase':'some_string',
-                    'content_type':'text', 'update_usr_state': ** one of ['hw_num', 'course'] or None **}};
+        :param triggers_out: dict like {state_out1_name:{'phrase':['some_string1', 'str2', etc],
+                     'update_usr_state': ** one of ['hw_num', 'course', etc] or None **}};
         :param handler_out: None or func(message, usr_states) which update usr_state and return next dialog state name;
 
         """
@@ -33,10 +33,11 @@ class State:
 
         for state_name, attribs in self.triggers_out.items():
             if attribs['phrase'] is not None:
-                markup.add(attribs['phrase'])
+                for txt in attribs['phrase']:
+                    markup.add(txt)
                 is_markup_filled = True
 
-        if (not self.return_back_button) and (not is_markup_filled):
+        if not is_markup_filled:
             markup = types.ReplyKeyboardRemove()
         return markup
 
@@ -61,7 +62,7 @@ class State:
         elif message.content_type == 'text':
             chat_id = message.chat.id
             for state_name, attribs in self.triggers_out.items():
-                if message.text == attribs['phrase']:
+                if message.text in attribs['phrase']:
                     update_usr_state = attribs.get('update_usr_state', None)
                     if update_usr_state is not None:
                         usr_states[chat_id][update_usr_state] = message.text
@@ -91,8 +92,7 @@ class DialogGraph:
 
     def run(self, message):
         if message.chat.username is None:
-            self.bot.send_message(message.chat.id,
-                                  'Для продолжения работы с ботом, пожалуйста, запилите себе username в настройках телеграм!')
+            self.bot.send_message(message.chat.id, universal_reply.NO_USERNAME_WARNING)
             return
 
         if message.chat.id not in self.usr_states:
@@ -100,4 +100,9 @@ class DialogGraph:
 
         curr_state_name = self.usr_states[message.chat.id]
         new_state_name = self.nodes[curr_state_name].default_handler(message, self.usr_states)
-        self.nodes[new_state_name].welcome(self.bot, message, self.usr_states)
+
+        # it is a way to make multiple steps within one node
+        if new_state_name == curr_state_name:
+            self.nodes[new_state_name].default_handler(message, self.usr_states)
+        else:
+            self.nodes[new_state_name].welcome(self.bot, message, self.usr_states)

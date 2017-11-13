@@ -6,7 +6,9 @@ STATES_ENUM = ['WAIT_USER_INTERACTION', 'COURSE_SELECTION',
 
 # possible_to_pass = {'NLP': ["Sem1", "Sem2", "Sem3"], 'RL': ['Sem1', 'Sem2']}
 
-hw_possible_to_pass = ["Sem1", "Sem2", "Sem3", "Sem4"]
+hw_possible_to_pass = ["Sem4", "Sem5"]
+hw_possible_to_check = ["Sem1", "Sem2", "Sem3", "Sem4"]
+
 marks = [str(i) for i in range(1, 6)]
 available_hw_resolutions = ('zip', 'rar', '7z', 'tar', 'tar.bz2', 'tar.gz', 'tar.xz', 'ipynb')
 bd_name = 'questions.db'

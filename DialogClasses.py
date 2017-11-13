@@ -5,35 +5,38 @@ from collections import defaultdict
 
 
 class State:
-    def __init__(self, name: str, triggers_out: Dict,
+    def __init__(self, name: str,
+                 triggers_out: Dict,
+                 hidden_states: List = None,
                  welcome_msg: str = None,
-                 parent_state: str = None,
-                 handler_out: Callable = None,
-                 handler_welcome: Callable = None,
-                 return_back_button=False):
+                 handler_welcome: Callable = None):
         """
         :param name: name of state object;
-        :param triggers_out: dict like {state_out1_name:{'phrase':['some_string1', 'str2', etc],
-                     'update_usr_state': ** one of ['hw_num', 'course', etc] or None **}};
+        :param triggers_out: dict like {state_out1_name:{'phrases':['some_string1', 'str2', etc],
+                                                         'content_type':'text'}};
         :param handler_out: None or func(message, usr_states) which update usr_state and return next dialog state name;
 
         """
         self.name = name
+        self.hidden_states = list(hidden_states),
         self.welcome_msg = welcome_msg
         self.triggers_out = triggers_out
-        self.parent_state = parent_state
-        self.handler_out = handler_out
         self.handler_welcome = handler_welcome
-        self.return_back_button = return_back_button
         self.reply_markup = self.make_reply_markup()
 
     def make_reply_markup(self):
+
+        # TODO:  hidden_states doesn't work:(
+        # print('hidden_states_type: ', type(self.hidden_states))
+        # print('hidden_states: ', self.hidden_states)
+        # print('triggers_out: ', self.triggers_out)
+
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         is_markup_filled = False
 
-        for state_name, attribs in self.triggers_out.items():
-            if attribs['phrase'] is not None:
-                for txt in attribs['phrase']:
+        for state_name, attrib in self.triggers_out.items():
+            if (len(attrib['phrases']) > 0) and (state_name not in self.hidden_states):
+                for txt in attrib['phrases']:
                     markup.add(txt)
                 is_markup_filled = True
 
@@ -41,35 +44,45 @@ class State:
             markup = types.ReplyKeyboardRemove()
         return markup
 
-    def welcome(self, bot, message, usr_states: Dict[Dict]):
+    def welcome_handler(self, bot, message):
         if self.handler_welcome is not None:
-            self.handler_welcome(bot, message, usr_states)
-        else:
-            bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup)
+            self.handler_welcome(bot, message)
+        bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup, parse_mode='Markdown')
 
-    def default_handler(self, bot, message, usr_states: Dict[Dict]):
+    def default_out_handler(self, bot, message):
+
+        # TODO: implement handler for bla-bla detection
+        if message.text == '/start':
+            return 'MAIN_MENU'
+
+        bot.send_message(message.chat.id, 'Я вас не понимаю.\n'
+                                          'Нажмите /start чтобы начать жизнь с чистого листа ☘️',)
+        return None
+
+    def out_handler(self, bot, message):
         """
         Default handler manage text messages and couldn't handle any photo/documents;
         It just apply special handler if it is not None;
         If message couldn't be handled None is returned;
         :param message:
-        :param usr_states:
+        :param bot:
         :return: name of the new state;
 
         """
-        if self.handler_out is not None:
-            return self.handler_out(bot, message, usr_states)
-        elif message.content_type == 'text':
-            chat_id = message.chat.id
-            for state_name, attribs in self.triggers_out.items():
-                if message.text in attribs['phrase']:
-                    update_usr_state = attribs.get('update_usr_state', None)
-                    if update_usr_state is not None:
-                        usr_states[chat_id][update_usr_state] = message.text
-                    usr_states[chat_id]['current_state'] = state_name
+        # TODO: do smth to react on [] triggers after all the others;
+        for state_name, attribs in self.triggers_out.items():
+            if message.content_type != 'text':
+                if message.content_type == attribs['content_type']:
                     return state_name
-        else:
-            return None
+
+            elif message.text in attribs['phrases']:
+                return state_name
+
+            # the case when any text message should route to state_name
+            elif len(attribs['phrases']) == 0:
+                return state_name
+
+        return self.default_out_handler(bot, message)
 
 
 class DialogGraph:
@@ -96,13 +109,14 @@ class DialogGraph:
             return
 
         if message.chat.id not in self.usr_states:
-            self.usr_states[message.chat.id]['currState'] = self.root_state
+            self.usr_states[message.chat.id]['current_state'] = self.root_state
 
-        curr_state_name = self.usr_states[message.chat.id]
-        new_state_name = self.nodes[curr_state_name].default_handler(message, self.usr_states)
+        print("msg: ", message.text)
+        curr_state_name = self.usr_states[message.chat.id]['current_state']
+        print('curr_state_name: ', curr_state_name)
+        new_state_name = self.nodes[curr_state_name].out_handler(self.bot, message)
+        print('new_state_name: ', new_state_name)
 
-        # it is a way to make multiple steps within one node
-        if new_state_name == curr_state_name:
-            self.nodes[new_state_name].default_handler(message, self.usr_states)
-        else:
-            self.nodes[new_state_name].welcome(self.bot, message, self.usr_states)
+        if new_state_name is not None:
+            self.usr_states[message.chat.id]['current_state'] = new_state_name
+            self.nodes[new_state_name].welcome_handler(self.bot, message)

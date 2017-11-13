@@ -24,10 +24,19 @@ markup_course = types.ReplyKeyboardMarkup(resize_keyboard=True)
 markup_course.row('🐟 RL 🐟')
 markup_course.row('🐸 NLP 🐸')
 
-markup_hw_q = types.ReplyKeyboardMarkup(resize_keyboard=True)
-markup_hw_q.row('🦉 Задать вопрос к семинару 🦉')
-markup_hw_q.row('🐌 Сдать домашку 🐌')
-markup_hw_q.row('Вернуться в начало')
+markup_menu = types.ReplyKeyboardMarkup(resize_keyboard=True)
+for button in config.STATES_DICT['MAIN_MENU']:
+    markup_menu.row(button)
+
+markup_hw_pass = types.ReplyKeyboardMarkup(resize_keyboard=True)
+for name in config.available_to_pass:
+    markup_hw_pass.row(name)
+markup_hw_pass.row('Вернуться назад')
+
+markup_hw_check = types.ReplyKeyboardMarkup(resize_keyboard=True)
+for name in config.available_to_check:
+    markup_hw_check.row(name)
+markup_hw_check.row('Вернуться назад')
 
 states = defaultdict(dict)
 
@@ -41,56 +50,68 @@ def handler(message):
     if message.chat.username is None:
         username_error(message)
         return
+# ---------------------------------------------------------------------------
 
     elif message.chat.id not in states:
         clear_state(message, states)
         default_callback(message, states)
 
+# ---------------------------------------------------------------------------
+
     elif states[chat_id]['currentState'] == 'WAIT_USER_INTERACTION':
         default_callback(message, states)
 
-    elif (states[chat_id]['currentState'] == 'COURSE_SELECTION') and (message.text in ['🐟 RL 🐟', '🐸 NLP 🐸']):
-        states[chat_id]['currentState'] = 'HW_OR_QUESTION_SELECTION'
-        states[chat_id]['course'] = message.text.split()[1]
-        choose_question_or_hw(message)
+#---------------------------------------------------------------------------
 
-    elif (states[chat_id]['currentState'] == 'HW_OR_QUESTION_SELECTION') and \
-            (message.text in ['🦉 Задать вопрос к семинару 🦉', '🐌 Сдать домашку 🐌']):
+    elif (states[chat_id]['currentState'] == 'MAIN_MENU') and \
+            (message.text in config.STATES_DICT['MAIN_MENU']):
         if message.text == '🦉 Задать вопрос к семинару 🦉':
             question_handler(message)
             states[chat_id]['currentState'] = 'IN_QUESTION'
 
         elif message.text == '🐌 Сдать домашку 🐌':
             hw_handler(message)
-            states[chat_id]['currentState'] = 'HW_NUM_SELECTION'
+            states[chat_id]['currentState'] = 'PASS_HW_NUM_SELECTION'
+
+        elif message.text == 'Проверить домашку':
+            hw_check_num_selection_handler(message)
+            states[chat_id]['currentState'] = 'CHECK_HW_NUM_SELECTION'
+
+        elif message.text == 'Узнать свою оценку':
+            know_mark_handler(message)
+            states[chat_id]['currentState'] = 'KNOW_MARK'
+#----------------------------------------------------------------------------
 
     elif (states[chat_id]['currentState'] == 'IN_QUESTION') and \
             (message.text != 'Вернуться в начало') and (message.content_type == 'text'):
         if message.text == 'Вернуться назад':
-            states[chat_id]['currentState'] = 'HW_OR_QUESTION_SELECTION'
-            choose_question_or_hw(message)
+            states[chat_id]['currentState'] = 'MAIN_MENU'
+            choose_menu_item(message)
         elif message.text == 'Задать еще один вопрос':
             question_handler(message)
         else:
             question_saver(message, course=states[chat_id]['course'])
+# ----------------------------------------------------------------------------
 
-    elif (states[chat_id]['currentState'] == 'HW_NUM_SELECTION') and (message.content_type == 'text') and \
-            ((message.text in config.possible_to_pass[states[chat_id]['course']]) or (message.text == 'Вернуться назад')):
-        if message.text in config.possible_to_pass[states[chat_id]['course']]:
+    elif (states[chat_id]['currentState'] == 'PASS_HW_NUM_SELECTION') and \
+            ((message.text in config.available_to_pass) or (message.text == 'Вернуться назад')):
+        if message.text in config.available_to_pass:
             states[chat_id]['currentState'] = 'IN_HW_UPLOAD'
-            states[chat_id]['hw_num'] = message.text
+            states[chat_id]['check_hw_num_selection'] = message.text
             hw_waiter(message)
         elif message.text == 'Вернуться назад':
-            states[chat_id]['currentState'] = 'HW_OR_QUESTION_SELECTION'
-            choose_question_or_hw(message)
+            states[chat_id]['currentState'] = 'MAIN_MENU'
+            choose_menu_item(message)
+# ----------------------------------------------------------------------------
 
     elif (states[chat_id]['currentState'] == 'IN_HW_UPLOAD') and \
             ((message.content_type in ['document', 'photo']) or message.text == 'Вернуться назад'):
         if message.text == 'Вернуться назад':
-            states[chat_id]['currentState'] = 'HW_NUM_SELECTION'
+            states[chat_id]['currentState'] = 'PASS_HW_NUM_SELECTION'
             hw_handler(message)
         else:
             hw_saver(message, states)
+# ----------------------------------------------------------------------------
     else:
         print('DEFAULT')
         default_callback(message, states)
@@ -100,34 +121,37 @@ def handler(message):
 
 # use this function as default handler
 def default_callback(message, states):
-    if message.text == '/start':
-        bot.send_message(message.chat.id,
-                         'WELCOME, *{}*!\nCHOOSE YOUR DESTINY!'.format(message.chat.username.upper()),
-                         reply_markup=markup_course, parse_mode='Markdown')
-        clear_state(message, states, set_state='COURSE_SELECTION')
+    if (message.text == '/start') or (message.text == 'Вернуться в начало'):
+        choose_menu_item(message)
+        clear_state(message, states, set_state='MAIN_MENU')
 
     elif message.text == '/help':
+        clear_state(message, states, set_state='MAIN_MENU')
         bot.send_message(message.chat.id,
-                         'Привет, {}!\nЯ умею принимать вопросы к семинарам и файлы с дз по курсам NLP & RL.\n'
-                         'Другие мои возможности находятся в разработке. Чтобы приступить к работе выберите курс.'
+                         'Привет, {}!\nЯ умею принимать вопросы к семинарам и файлы с дз по курсу NLP.\n'
+                         'Также я устраиваю кросс-проверку домашних работ между участниками курса.\n'
+                         'С моей помощью вы можете узнать свою оценку за дз.\n'
+                         'Другие мои возможности находятся в разработке.\n'
+                         'Чтобы приступить к работе выберите интересующую опцию.'
                          .format(message.chat.username.title()),
-                         reply_markup=markup_course)
-
-    elif message.text == 'Вернуться в начало':
-        bot.send_message(message.chat.id,
-                         'HERE AGAIN, *{}*!\nCHOOSE YOUR DESTINY!'.format(message.chat.username.upper()),
-                         reply_markup=markup_course, parse_mode='Markdown')
-        clear_state(message, states, set_state='COURSE_SELECTION')
+                         reply_markup=markup_menu)
 
     else:
         bla_bla_detected(message)
         clear_state(message, states)
 
+def know_mark_handler(message):
+    sqldb = SQLighter(config.bd_name)
+
+
+
+def hw_check_num_selection_handler(message):
+    bot.send_message(message.chat.id, 'Выберите заданьице', reply_markup=markup_hw_check)
 
 def clear_state(message, states, set_state='WAIT_USER_INTERACTION'):
     states[message.chat.id]['currentState'] = set_state
-    states[message.chat.id]['course'] = None
-    states[message.chat.id]['hw_num'] = None
+    states[message.chat.id]['course'] = 'NLP'
+    states[message.chat.id]['check_hw_num_selection'] = None
 
 
 def username_error(message):
@@ -136,8 +160,8 @@ def username_error(message):
                      reply_markup=markup_cleared)
 
 
-def choose_question_or_hw(message):
-    bot.send_message(message.chat.id, 'Выберите доступное действие, пожалуйста 🦊', reply_markup=markup_hw_q)
+def choose_menu_item(message):
+    bot.send_message(message.chat.id, 'Выберите доступное действие, пожалуйста 🦊', reply_markup=markup_menu)
 
 
 # Задать вопрос к семинару
@@ -148,9 +172,8 @@ def question_handler(message):
 
 # Сдать домашку
 def hw_handler(message):
-    markup_hw = make_hw_keyboard(states[message.chat.id]['course'])
     bot.send_message(message.chat.id, 'Пожалуйста, выберите из списка доступных для сдачи заданий.',
-                     reply_markup=markup_hw)
+                     reply_markup=markup_hw_pass)
 
 
 # hw -- выбор домашки
@@ -177,22 +200,21 @@ def hw_saver(message, states):
                          .format(username.title(), str(config.available_hw_resolutions)))
         return
 
-    hw_num = states[message.chat.id]['hw_num']
-    course = states[message.chat.id]['course']
-    markup_hw = make_hw_keyboard(course)
+    hw_num = states[message.chat.id]['check_hw_num_selection']
+    course = 'NLP'
     sqldb = SQLighter(config.bd_name)
     if sqldb.is_exists_hw(user_id=username, hw_num=hw_num, course=course):
         sqldb.upd_homework(user_id=username, hw_num=hw_num, course=course, file_id=message.document.file_id)
         bot.send_message(message.chat.id, 'Уважаемый *{}*, ваше задание {} было обновлено. Хорошего дня:) 🐾\n'
                          .format(username.title(), hw_num),
-                         reply_markup=markup_hw, parse_mode='Markdown')
+                         reply_markup=markup_hw_pass, parse_mode='Markdown')
     else:
         sqldb.add_homework(user_id=username, hw_num=hw_num, course=course, file_id=message.document.file_id)
         bot.send_message(message.chat.id, 'Уважаемый *{}*, ваш файлик был заботливо сохранен как задание {} 🐾\n'
-                     .format(username.title(), hw_num),
-                     reply_markup=markup_hw, parse_mode='Markdown')
-    states[message.chat.id]['currentState'] = 'HW_NUM_SELECTION'
-    states[message.chat.id]['hw_num'] = None
+                         .format(username.title(), hw_num),
+                         reply_markup=markup_hw_pass, parse_mode='Markdown')
+    states[message.chat.id]['currentState'] = 'PASS_HW_NUM_SELECTION'
+    states[message.chat.id]['check_hw_num_selection'] = None
 
 # Сохранение вопроса к семинару
 def question_saver(message, course):
@@ -207,14 +229,6 @@ def bla_bla_detected(message):
     bot.send_message(message.chat.id, 'Я вас не понимаю.\n'
                                       'Нажмите /start чтобы начать жизнь с чистого листа ☘️',
                      reply_markup=markup_cleared)
-
-
-def make_hw_keyboard(course):
-    markup_hw = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for name in config.possible_to_pass[course]:
-        markup_hw.row(name)
-    markup_hw.row('Вернуться назад')
-    return markup_hw
 
 
 if __name__ == '__main__':

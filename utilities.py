@@ -1,7 +1,6 @@
 import requests
 import os
 import config
-from telebot import types
 
 def download_file(bot, file_id, folder_name, filename):
     file_info = bot.get_file(file_id)

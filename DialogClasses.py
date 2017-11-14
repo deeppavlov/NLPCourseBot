@@ -34,7 +34,6 @@ class State:
 
     def make_reply_markup(self):
 
-        print('row_width: ', self.row_width)
         markup = types.ReplyKeyboardMarkup(row_width=self.row_width, resize_keyboard=True)
         is_markup_filled = False
         tmp_buttons = []

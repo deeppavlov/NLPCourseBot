@@ -46,8 +46,6 @@ class State:
         bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup, parse_mode='Markdown')
 
     def default_out_handler(self, bot, message):
-
-        # TODO: implement handler for bla-bla detection
         if message.text == '/start':
             return 'MAIN_MENU'
 
@@ -65,7 +63,7 @@ class State:
         :return: name of the new state;
 
         """
-        # TODO: do smth to react on [] triggers after all the others;
+        any_text_state = None
         for state_name, attribs in self.triggers_out.items():
             if message.content_type != 'text':
                 if message.content_type == attribs['content_type']:
@@ -75,8 +73,11 @@ class State:
                 return state_name
 
             # the case when any text message should route to state_name
-            elif len(attribs['phrases']) == 0:
-                return state_name
+            elif (len(attribs['phrases']) == 0) and (attribs['content_type'] == 'text'):
+                any_text_state = state_name
+
+        if any_text_state is not None:
+            return any_text_state
 
         return self.default_out_handler(bot, message)
 

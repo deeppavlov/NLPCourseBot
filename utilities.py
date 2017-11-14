@@ -1,6 +1,8 @@
 import requests
 import os
 import config
+import telebot
+
 
 def download_file(bot, file_id, folder_name, filename):
     file_info = bot.get_file(file_id)
@@ -12,3 +14,11 @@ def download_file(bot, file_id, folder_name, filename):
         for chunk in file.iter_content(chunk_size=1024):
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
+
+
+if __name__ == '__main__':
+    bot = telebot.TeleBot(config.token)
+    file_id = "<test_token>"
+    folder_name = '/home/fogside/tmp/'
+    file_name = '<test_name>.ipynb'
+    download_file(bot=bot, file_id=file_id, folder_name=folder_name, filename=file_name)

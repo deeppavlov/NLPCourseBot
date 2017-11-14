@@ -18,7 +18,7 @@ class State:
 
         """
         self.name = name
-        self.hidden_states = list(hidden_states),
+        self.hidden_states = hidden_states
         self.welcome_msg = welcome_msg
         self.triggers_out = triggers_out
         self.handler_welcome = handler_welcome
@@ -26,16 +26,12 @@ class State:
 
     def make_reply_markup(self):
 
-        # TODO:  hidden_states doesn't work:(
-        # print('hidden_states_type: ', type(self.hidden_states))
-        # print('hidden_states: ', self.hidden_states)
-        # print('triggers_out: ', self.triggers_out)
-
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         is_markup_filled = False
-
         for state_name, attrib in self.triggers_out.items():
-            if (len(attrib['phrases']) > 0) and (state_name not in self.hidden_states):
+            hidden_flag = ((self.hidden_states is not None) and (state_name not in self.hidden_states)) \
+                          or (self.hidden_states is None)
+            if len(attrib['phrases']) > 0 and hidden_flag:
                 for txt in attrib['phrases']:
                     markup.add(txt)
                 is_markup_filled = True
@@ -56,7 +52,7 @@ class State:
             return 'MAIN_MENU'
 
         bot.send_message(message.chat.id, 'Я вас не понимаю.\n'
-                                          'Нажмите /start чтобы начать жизнь с чистого листа ☘️',)
+                                          'Нажмите /start чтобы начать жизнь с чистого листа ☘️', )
         return None
 
     def out_handler(self, bot, message):

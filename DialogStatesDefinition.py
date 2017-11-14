@@ -2,6 +2,7 @@ from DialogClasses import *
 from Sqlighter import SQLighter
 import universal_reply
 import config
+import utilities
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
                              triggers_out={'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}},
@@ -28,8 +29,8 @@ ask_question_start = State(name='ASK_QUESTION_START',
 # ----------------------------------------------------------------------------
 
 def save_question_handler(bot, message):
-    sqldb = SQLighter(config.bd_name)
-    sqldb.write_question(user_id=message.chat.username, question=message.text)
+    print(message.text)
+    pass
 
 
 save_question = State(name='SAVE_QUESTION',
@@ -43,6 +44,7 @@ save_question = State(name='SAVE_QUESTION',
 # ----------------------------------------------------------------------------
 
 pass_hw_num_selection = State(name='PASS_HW_NUM_SELECT',
+                              row_width=2,
                               triggers_out={'PASS_HW_CHOSEN_NUM': {'phrases': config.hw_possible_to_pass,
                                                                    'content_type': 'text'},
                                             'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
@@ -88,11 +90,15 @@ get_mark = State(name='GET_MARK',
 
 # ----------------------------------------------------------------------------
 
+# custom_kb_1 = utilities.make_right_keyboard(config.hw_possible_to_check, 3,
+#                                             round(len(config.hw_possible_to_check) / 3))
+
 check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
                                triggers_out={'CHECK_HW_SEND': {'phrases': config.hw_possible_to_check,
                                                                'content_type': 'text'},
                                              'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
-                               welcome_msg='Выберите номер задания для проверки')
+                               welcome_msg='Выберите номер задания для проверки',
+                               row_width=2)
 
 
 # ----------------------------------------------------------------------------
@@ -101,9 +107,13 @@ def choose_file_and_send(bot, message):
     pass
 
 
+# custom_kb_2 = utilities.make_right_keyboard(config.marks, 3,
+#                                             round(len(config.marks) / 3))
+
 check_hw_send = State(name='CHECK_HW_SEND',
-                      triggers_out={'CHECK_HW_SAVE_MARK': {'phrases': config.marks, 'content_type':'text'}},
+                      triggers_out={'CHECK_HW_SAVE_MARK': {'phrases': config.marks, 'content_type': 'text'}},
                       handler_welcome=choose_file_and_send,
+                      row_width=3,
                       welcome_msg="Пожалуйста, оцените работу.")
 
 

@@ -2,11 +2,9 @@ import DialogStatesDefinition
 from DialogClasses import DialogGraph
 import telebot
 import config
-import os
 from flask import Flask, request
 
-token = os.environ['TOKEN']
-bot = telebot.TeleBot(token)
+bot = telebot.TeleBot(config.token)
 nodes = [DialogStatesDefinition.wait_usr_interaction,
          DialogStatesDefinition.main_menu,
 

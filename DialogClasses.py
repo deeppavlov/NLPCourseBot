@@ -9,12 +9,20 @@ class State:
                  triggers_out: Dict,
                  hidden_states: List = None,
                  welcome_msg: str = None,
-                 handler_welcome: Callable = None):
+                 row_width=1,
+                 handler_welcome: Callable = None,
+                 custom_markup: List = None):
         """
         :param name: name of state object;
         :param triggers_out: dict like {state_out1_name:{'phrases':['some_string1', 'str2', etc],
                                                          'content_type':'text'}};
-        :param handler_out: None or func(message, usr_states) which update usr_state and return next dialog state name;
+        :param hidden_states: list of state names that have to be reachable from this state
+                              but they don't have to be shown on the keyboard;
+        :param welcome_msg: what does the State have to say to usr after welcome_handler()
+        :param handler_welcome: function that handle income message
+        :param custom_markup: None or list of formatted buttons like this:
+                                            [['top-left', 'top-right'],
+                                            ['bottom-left', 'bottom-right']]
 
         """
         self.name = name
@@ -22,23 +30,27 @@ class State:
         self.welcome_msg = welcome_msg
         self.triggers_out = triggers_out
         self.handler_welcome = handler_welcome
-        self.reply_markup = self.make_reply_markup()
+        self.row_width = row_width
+        self.reply_markup = self.make_reply_markup(custom_markup)
 
-    def make_reply_markup(self):
+    def make_reply_markup(self, custom_markup):
 
-        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        is_markup_filled = False
-        for state_name, attrib in self.triggers_out.items():
-            hidden_flag = ((self.hidden_states is not None) and (state_name not in self.hidden_states)) \
-                          or (self.hidden_states is None)
-            if len(attrib['phrases']) > 0 and hidden_flag:
-                for txt in attrib['phrases']:
-                    markup.add(txt)
-                is_markup_filled = True
+        if custom_markup is None:
+            markup = types.ReplyKeyboardMarkup()
+            is_markup_filled = False
+            for state_name, attrib in self.triggers_out.items():
+                hidden_flag = ((self.hidden_states is not None) and (state_name not in self.hidden_states)) \
+                              or (self.hidden_states is None)
+                if len(attrib['phrases']) > 0 and hidden_flag:
+                    for txt in attrib['phrases']:
+                        markup.add(types.KeyboardButton(txt))
+                    is_markup_filled = True
 
-        if not is_markup_filled:
-            markup = types.ReplyKeyboardRemove()
-        return markup
+            if not is_markup_filled:
+                markup = types.ReplyKeyboardRemove()
+            return markup
+        else:
+            return custom_markup
 
     def welcome_handler(self, bot, message):
         if self.handler_welcome is not None:
@@ -49,8 +61,7 @@ class State:
         if message.text == '/start':
             return 'MAIN_MENU'
 
-        bot.send_message(message.chat.id, 'Я вас не понимаю.\n'
-                                          'Нажмите /start чтобы начать жизнь с чистого листа ☘️', )
+        bot.send_message(message.chat.id, universal_reply.DEFAULT_ANS)
         return None
 
     def out_handler(self, bot, message):
@@ -108,11 +119,8 @@ class DialogGraph:
         if message.chat.id not in self.usr_states:
             self.usr_states[message.chat.id]['current_state'] = self.root_state
 
-        print("msg: ", message.text)
         curr_state_name = self.usr_states[message.chat.id]['current_state']
-        print('curr_state_name: ', curr_state_name)
         new_state_name = self.nodes[curr_state_name].out_handler(self.bot, message)
-        print('new_state_name: ', new_state_name)
 
         if new_state_name is not None:
             self.usr_states[message.chat.id]['current_state'] = new_state_name

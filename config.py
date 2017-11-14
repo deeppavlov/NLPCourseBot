@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
+import os
 
-STATES_ENUM = ['WAIT_USER_INTERACTION', 'COURSE_SELECTION',
-               'HW_OR_QUESTION_SELECTION', 'HW_NUM_SELECTION',
-               'IN_QUESTION', 'IN_HW_UPLOAD']
-
-# possible_to_pass = {'NLP': ["Sem1", "Sem2", "Sem3"], 'RL': ['Sem1', 'Sem2']}
+token = os.environ['TOKEN']
 
 hw_possible_to_pass = ["Sem4", "Sem5"]
 hw_possible_to_check = ["Sem1", "Sem2", "Sem3", "Sem4"]

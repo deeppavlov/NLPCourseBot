@@ -10,8 +10,7 @@ class State:
                  hidden_states: List = None,
                  welcome_msg: str = None,
                  row_width=1,
-                 handler_welcome: Callable = None,
-                 custom_markup: List = None):
+                 handler_welcome: Callable = None):
         """
         :param name: name of state object;
         :param triggers_out: dict like {state_out1_name:{'phrases':['some_string1', 'str2', etc],
@@ -31,26 +30,26 @@ class State:
         self.triggers_out = triggers_out
         self.handler_welcome = handler_welcome
         self.row_width = row_width
-        self.reply_markup = self.make_reply_markup(custom_markup)
+        self.reply_markup = self.make_reply_markup()
 
-    def make_reply_markup(self, custom_markup):
+    def make_reply_markup(self):
 
-        if custom_markup is None:
-            markup = types.ReplyKeyboardMarkup()
-            is_markup_filled = False
-            for state_name, attrib in self.triggers_out.items():
-                hidden_flag = ((self.hidden_states is not None) and (state_name not in self.hidden_states)) \
-                              or (self.hidden_states is None)
-                if len(attrib['phrases']) > 0 and hidden_flag:
-                    for txt in attrib['phrases']:
-                        markup.add(types.KeyboardButton(txt))
-                    is_markup_filled = True
+        print('row_width: ', self.row_width)
+        markup = types.ReplyKeyboardMarkup(row_width=self.row_width, resize_keyboard=True)
+        is_markup_filled = False
+        tmp_buttons = []
+        for state_name, attrib in self.triggers_out.items():
+            hidden_flag = ((self.hidden_states is not None) and (state_name not in self.hidden_states)) \
+                          or (self.hidden_states is None)
+            if len(attrib['phrases']) > 0 and hidden_flag:
+                for txt in attrib['phrases']:
+                    tmp_buttons.append(types.KeyboardButton(txt))
+                is_markup_filled = True
 
-            if not is_markup_filled:
-                markup = types.ReplyKeyboardRemove()
-            return markup
-        else:
-            return custom_markup
+        markup.add(*tmp_buttons)
+        if not is_markup_filled:
+            markup = types.ReplyKeyboardRemove()
+        return markup
 
     def welcome_handler(self, bot, message):
         if self.handler_welcome is not None:

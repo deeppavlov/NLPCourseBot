@@ -90,9 +90,6 @@ get_mark = State(name='GET_MARK',
 
 # ----------------------------------------------------------------------------
 
-# custom_kb_1 = utilities.make_right_keyboard(config.hw_possible_to_check, 3,
-#                                             round(len(config.hw_possible_to_check) / 3))
-
 check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
                                triggers_out={'CHECK_HW_SEND': {'phrases': config.hw_possible_to_check,
                                                                'content_type': 'text'},
@@ -105,10 +102,6 @@ check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
 
 def choose_file_and_send(bot, message):
     pass
-
-
-# custom_kb_2 = utilities.make_right_keyboard(config.marks, 3,
-#                                             round(len(config.marks) / 3))
 
 check_hw_send = State(name='CHECK_HW_SEND',
                       triggers_out={'CHECK_HW_SAVE_MARK': {'phrases': config.marks, 'content_type': 'text'}},

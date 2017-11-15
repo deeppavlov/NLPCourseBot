@@ -29,8 +29,8 @@ ask_question_start = State(name='ASK_QUESTION_START',
 # ----------------------------------------------------------------------------
 
 def save_question_handler(bot, message):
-    print(message.text)
-    pass
+    sqlighter = SQLighter(config.bd_name)
+    sqlighter.write_question(message.chat.username, message.text)
 
 
 save_question = State(name='SAVE_QUESTION',
@@ -54,7 +54,8 @@ pass_hw_num_selection = State(name='PASS_HW_NUM_SELECT',
 # ----------------------------------------------------------------------------
 
 def make_fake_db_record(bot, message):
-    pass
+    sqldb = SQLighter(config.bd_name)
+    sqldb.make_fake_db_record(message.chat.username, message.text)
 
 
 pass_hw_chosen_num = State(name='PASS_HW_CHOSEN_NUM',
@@ -66,15 +67,38 @@ pass_hw_chosen_num = State(name='PASS_HW_CHOSEN_NUM',
 
 # ----------------------------------------------------------------------------
 
-def hw_saver(bot, message):
-    pass
+class HwUploadState(State):
+    def welcome_handler(self, bot, message):
+        username = message.chat.username
+        if not message.document.file_name.endswith(config.available_hw_resolutions):
+            tmp_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+            tmp_markup.add(types.KeyboardButton('Меню'))
+            bot.send_message(message.chat.id, "🚫 {}, очень жаль но файлик не сдается в нашу систему...\n"
+                                              "Возможны следующие расширения файлов: {}.\n"
+                                              "Напоминаю, что дз сдается в виде одного файла архива или одного Jupyter ноутбука."
+                             .format(username.title(), str(config.available_hw_resolutions)), reply_markup=tmp_markup)
+        else:
+            sqldb = SQLighter(config.bd_name)
+            hw_num = sqldb.upd_homework(user_id=username, file_id=message.document.file_id)
+            bot.send_message(message.chat.id,
+                             'Уважаемый *{}*, ваш файлик был заботливо сохранен как задание {} 🐾\n'
+                             .format(username.title(), hw_num),
+                             reply_markup=self.reply_markup, parse_mode='Markdown')
+
+    def out_handler(self, bot, message):
+        for state_name, attribs in self.triggers_out.items():
+            if message.content_type == 'document':
+                return self.welcome_handler(bot, message)
+
+            elif (message.content_type == 'text') and (message.text in attribs['phrases']):
+                return state_name
+        return self.default_out_handler(bot, message)
 
 
-pass_hw_upload = State(name='PASS_HW_UPLOAD',
-                       triggers_out={'PASS_HW_NUM_SELECT': {'phrases': ['Сдать еще одно дз'], 'content_type': 'text'},
-                                     'MAIN_MENU': {'phrases': ['Меню'], 'content_type': 'text'}},
-                       handler_welcome=hw_saver,
-                       welcome_msg='Ваш файлик был заботливо сохранен 🐾\n')
+pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
+                               triggers_out={
+                                   'PASS_HW_NUM_SELECT': {'phrases': ['Сдать еще одно дз'], 'content_type': 'text'},
+                                   'MAIN_MENU': {'phrases': ['Меню'], 'content_type': 'text'}})
 
 
 # ----------------------------------------------------------------------------
@@ -102,6 +126,7 @@ check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
 
 def choose_file_and_send(bot, message):
     pass
+
 
 check_hw_send = State(name='CHECK_HW_SEND',
                       triggers_out={'CHECK_HW_SAVE_MARK': {'phrases': config.marks, 'content_type': 'text'}},

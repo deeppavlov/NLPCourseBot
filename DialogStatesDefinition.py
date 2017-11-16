@@ -3,7 +3,6 @@ from Sqlighter import SQLighter
 import universal_reply
 import config
 import random
-import utilities
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
                              triggers_out={'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}},
@@ -172,9 +171,9 @@ admin_menu = State(name='ADMIN_MENU',
 
 def get_questions(bot, message, sqldb):
     questions = sqldb.get_questions_last_week()
-    res = '*Questions for the last week:*\n'
+    res = '*Questions for the last week*\n\т'
     for user_id, question, date in questions:
-        res += '*User*: ' + user_id + ' *asked at* ' + str(date) + ':\n_' + question + '_\n\n'
+        res += '*User*: ' + user_id + ' *asked at* ' + date + ':\n_' + question + '_\n\n'
     bot.send_message(message.chat.id, res, parse_mode='Markdown')
 
 

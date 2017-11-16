@@ -12,9 +12,13 @@ class SQLighter:
 
     def get_questions_last_week(self):
         """ Get only fresh questions from last n days """
-        return self.cursor.execute("SELECT user_id, question, date_added "
-                                   "FROM Questions WHERE "
-                                    "(date_added >= strftime('%s','now','-7 day'))").fetchall()
+        return self.cursor.execute("SELECT user_id, question, datetime(q.date_added, 'unixepoch', 'localtime') "
+                                   "FROM questions q "
+                                   "WHERE (q.date_added >= strftime('%s','now','-7 day'))")
+
+        # ""SELECT user_id, question, date_added "
+        #                        "FROM Questions "
+        #                        "WHERE (date_added >= strftime('%s','now','-7 day'))").fetchall()
 
     def write_question(self, user_id, question):
         """ Insert question into BD """
@@ -54,6 +58,7 @@ class SQLighter:
                                    "WHERE user_id = ? AND file_id = "
                                    "(SELECT file_id FROM hw_checking "
                                    "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
+
     def get_marks(self, user_id):
         return self.cursor.execute("SELECT hw.hw_num, hw.date, avg(hw_checking.mark) avg_mark "
                                    "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
@@ -61,8 +66,12 @@ class SQLighter:
                                    "AND hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
                                    "GROUP BY hw.date, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
 
+    def get_checked_works_stat(self):
+        return self.cursor.execute("SELECT ")
+
     def close(self):
         self.connection.close()
+
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)

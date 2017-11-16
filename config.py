@@ -4,7 +4,7 @@ import os
 token = os.environ['TOKEN']
 
 hw_possible_to_pass = ["Sem4", "Sem5"]
-hw_possible_to_check = ["Sem1", "Sem2", "Sem3", "Sem4"]
+hw_possible_to_check = ["Sem1", "Sem2", "Sem4", "Sem5"]
 
 marks = [str(i) for i in range(1, 6)]
 available_hw_resolutions = ('zip', 'rar', '7z', 'tar', 'tar.bz2', 'tar.gz', 'tar.xz', 'ipynb')

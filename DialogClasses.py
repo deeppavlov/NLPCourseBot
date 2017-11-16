@@ -20,9 +20,6 @@ class State:
                               but they don't have to be shown on the keyboard;
         :param welcome_msg: what does the State have to say to usr after welcome_handler()
         :param handler_welcome: function that handle income message
-        :param custom_markup: None or list of formatted buttons like this:
-                                            [['top-left', 'top-right'],
-                                            ['bottom-left', 'bottom-right']]
 
         """
         self.name = name
@@ -32,6 +29,7 @@ class State:
         self.handler_welcome = handler_welcome
         self.row_width = row_width
         self.reply_markup = self.make_reply_markup()
+        print('STATE {} obj has been initialized\n'.format(self.name))
 
     def make_reply_markup(self):
 
@@ -43,10 +41,10 @@ class State:
                           or (self.hidden_states is None)
             if len(attrib['phrases']) > 0 and hidden_flag:
                 for txt in attrib['phrases']:
-                    tmp_buttons.append(types.KeyboardButton(txt))
+                    tmp_buttons.append(txt)
                 is_markup_filled = True
-
-        markup.add(*tmp_buttons)
+        tmp_buttons = sorted(tmp_buttons)
+        markup.add(*(types.KeyboardButton(button) for button in tmp_buttons))
         if not is_markup_filled:
             markup = types.ReplyKeyboardRemove()
         return markup

@@ -16,10 +16,6 @@ class SQLighter:
                                    "FROM questions q "
                                    "WHERE (q.date_added >= strftime('%s','now','-7 day'))")
 
-        # ""SELECT user_id, question, date_added "
-        #                        "FROM Questions "
-        #                        "WHERE (date_added >= strftime('%s','now','-7 day'))").fetchall()
-
     def write_question(self, user_id, question):
         """ Insert question into BD """
         self.cursor.execute("INSERT INTO Questions (user_id, question, date_added)"
@@ -67,7 +63,10 @@ class SQLighter:
                                    "GROUP BY hw.date, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
 
     def get_checked_works_stat(self):
-        return self.cursor.execute("SELECT ")
+        return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
+                                   "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
+                                   "WHERE hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
+                                   "GROUP BY hw.hw_num ORDER BY checks_count ").fetchall()
 
     def close(self):
         self.connection.close()

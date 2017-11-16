@@ -10,10 +10,11 @@ wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
 # ----------------------------------------------------------------------------
 
 main_menu = State(name='MAIN_MENU',
-                  triggers_out={'PASS_HW_NUM_SELECT': {'phrases': ['Сдать дз'], 'content_type': 'text'},
-                                'ASK_QUESTION_START': {'phrases': ['Задать вопрос к семинару'], 'content_type': 'text'},
-                                'GET_MARK': {'phrases': ['Узнать оценки за дз'], 'content_type': 'text'},
-                                'CHECK_HW_NUM_SELECT': {'phrases': ['Проверить дз'], 'content_type': 'text'},
+                  triggers_out={'PASS_HW_NUM_SELECT': {'phrases': ['🐟 Сдать дз 🐠'], 'content_type': 'text'},
+                                'ASK_QUESTION_START': {'phrases': ['🦉 Задать вопрос к семинару 🦉'],
+                                                       'content_type': 'text'},
+                                'GET_MARK': {'phrases': ['🐝 Узнать оценки за дз 🐝'], 'content_type': 'text'},
+                                'CHECK_HW_NUM_SELECT': {'phrases': ['🐌 Проверить дз 🐌'], 'content_type': 'text'},
                                 'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}},
                   hidden_states=['ADMIN_MENU'],
                   welcome_msg='Выберите доступное действие, пожалуйста')
@@ -23,7 +24,7 @@ main_menu = State(name='MAIN_MENU',
 ask_question_start = State(name='ASK_QUESTION_START',
                            triggers_out={'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'},
                                          'SAVE_QUESTION': {'phrases': [], 'content_type': 'text'}},
-                           welcome_msg='Сформулируйте вопрос к семинаристу и отправьте его одним сообщением.')
+                           welcome_msg='Сформулируйте вопрос к семинаристу и отправьте его одним сообщением 🐠.')
 
 
 # ----------------------------------------------------------------------------
@@ -76,10 +77,10 @@ class HwUploadState(State):
                                               "Напоминаю, что дз сдается в виде одного файла архива или одного Jupyter ноутбука."
                              .format(username.title(), str(config.available_hw_resolutions)), reply_markup=tmp_markup)
         else:
-            hw_num = sqldb.upd_homework(user_id=username, file_id=message.document.file_id)
+            sqldb.upd_homework(user_id=username, file_id=message.document.file_id)
             bot.send_message(message.chat.id,
-                             'Уважаемый *{}*, ваш файлик был заботливо сохранен как задание {} 🐾\n'
-                             .format(username.title(), hw_num),
+                             'Уважаемый *{}*, ваш файлик был заботливо сохранен 🐾\n'
+                             .format(username.title()),
                              reply_markup=self.reply_markup, parse_mode='Markdown')
 
     def out_handler(self, bot, message, sqldb: SQLighter):
@@ -102,9 +103,15 @@ pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
 
 def show_marks_table(bot, message, sqldb):
     marks = sqldb.get_marks(message.chat.username)
-    print(marks)
-    ans = '*HW_NUM*\t*MARK*\n' + '\n ------ \n'.join([hw_num + '\t' + str(mark) for hw_num, date, mark in marks])
-    bot.send_message(message.chat.id, ans, parse_mode='Markdown')
+    if len(marks) < 1:
+        bot.send_message(message.chat.id, 'Уважаемый *{}*,'
+                                          ' ваши работы еще не были проверены ни одним разумным существом.\n'
+                                          'Остается надеяться и верить в лучшее 🐸'.format(
+            message.chat.username.title()),
+                         parse_mode='Markdown')
+    else:
+        ans = '*HW_NUM*\t*MARK*\n' + '\n ------ \n'.join([hw_num + '\t' + str(mark) for hw_num, date, mark in marks])
+        bot.send_message(message.chat.id, ans, parse_mode='Markdown')
 
 
 get_mark = State(name='GET_MARK',
@@ -171,7 +178,7 @@ admin_menu = State(name='ADMIN_MENU',
 
 def get_questions(bot, message, sqldb):
     questions = sqldb.get_questions_last_week()
-    res = '*Questions for the last week*\n\т'
+    res = '*Questions for the last week*\n'
     for user_id, question, date in questions:
         res += '*User*: ' + user_id + ' *asked at* ' + date + ':\n_' + question + '_\n\n'
     bot.send_message(message.chat.id, res, parse_mode='Markdown')
@@ -186,10 +193,17 @@ know_new_questions = State(name='KNOW_NEW_QUESTIONS',
 # ----------------------------------------------------------------------------
 
 def get_hw_stat(bot, message, sqldb):
-    pass
+    hw_stat = sqldb.get_checked_works_stat()
+    if len(hw_stat) == 0:
+        bot.send_message(message.chat.id, "Нет проверенных домашек совсем:( Грусть печаль.")
+    else:
+        ans = '_Количество проверенных работ на каждое задание_\n'
+        for sem, count in hw_stat:
+            ans += sem + '\t' + str(count) + '\n'
+        bot.send_message(message.chat.id, ans, parse_mode='Markdown')
 
 
 see_hw_stat = State(name='SEE_HW_STAT',
                     triggers_out={'ADMIN_MENU': {'phrases': ['Назад в админку'], 'content_type': 'text'}},
                     handler_welcome=get_hw_stat,
-                    welcome_msg='Это все домашки')
+                    welcome_msg='Это все что есть проверенного.\nЕсли какого номера тут нет, значит его не проверили.')

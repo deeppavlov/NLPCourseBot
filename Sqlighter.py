@@ -10,17 +10,11 @@ class SQLighter:
         self.connection.isolation_level = None
         self.cursor = self.connection.cursor()
 
-    # def check_hw_date(self, user_id, hw_num, course):
-    #     """ Check if that hw_num is exists for user_id """
-    #     with self.connection:
-    #         return self.cursor.execute("SELECT datetime(date, 'unixepoch') FROM hw WHERE (user_id = ?) AND (hw_num = ?) AND (course = ?)",
-    #                                    (user_id, hw_num, course)).fetchall()
-    #
-    # def select_questions_last_n_days(self, n_days):
-    #     """ Get only fresh questions from last n days """
-    #     with self.connection:
-    #         return self.cursor.execute("SELECT question FROM Questions WHERE "
-    #                                    "(date_added >= strftime('%s','now','-{} day'))".format(n_days)).fetchall()
+    def get_questions_last_week(self):
+        """ Get only fresh questions from last n days """
+        return self.cursor.execute("SELECT user_id, question, date_added "
+                                   "FROM Questions WHERE "
+                                    "(date_added >= strftime('%s','now','-7 day'))").fetchall()
 
     def write_question(self, user_id, question):
         """ Insert question into BD """
@@ -72,12 +66,3 @@ class SQLighter:
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-
-    # print(type(pd_df))
-    # print(sql.is_exists_hw(232, 'sem2'))
-    # sql.add_homework(232, 'sem2', 'dfgsdfe54df')
-    # print(sql.is_exists_hw(232, 'sem2'))
-    # sql.upd_homework(232, 'sem2', 'ersSDFgsresrEr34')
-    # print(sql.is_exists_hw(232, 'sem2'))
-    # sql.write_question(34, 'sdfgserge dfgs')
-    # print(sql.select_questions_last_n_days(3))

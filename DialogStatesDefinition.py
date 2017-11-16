@@ -104,6 +104,9 @@ pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
 def show_marks_table(bot, message, sqldb):
     marks = sqldb.get_marks(message.chat.username)
     print(marks)
+    ans = '*HW_NUM*\t*MARK*\n' + '\n ------ \n'.join([hw_num + '\t' + str(mark) for hw_num, date, mark in marks])
+    bot.send_message(message.chat.id, ans, parse_mode='Markdown')
+
 
 get_mark = State(name='GET_MARK',
                  triggers_out={'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
@@ -168,7 +171,11 @@ admin_menu = State(name='ADMIN_MENU',
 # ----------------------------------------------------------------------------
 
 def get_questions(bot, message, sqldb):
-    pass
+    questions = sqldb.get_questions_last_week()
+    res = '*Questions for the last week:*\n'
+    for user_id, question, date in questions:
+        res += '*User*: ' + user_id + ' *asked at* ' + str(date) + ':\n_' + question + '_\n\n'
+    bot.send_message(message.chat.id, res, parse_mode='Markdown')
 
 
 know_new_questions = State(name='KNOW_NEW_QUESTIONS',

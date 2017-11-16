@@ -2,6 +2,7 @@ from typing import List, Dict, Callable
 import universal_reply
 from telebot import types
 from collections import defaultdict
+from Sqlighter import SQLighter
 
 
 class State:
@@ -50,9 +51,9 @@ class State:
             markup = types.ReplyKeyboardRemove()
         return markup
 
-    def welcome_handler(self, bot, message):
+    def welcome_handler(self, bot, message, sqldb: SQLighter):
         if self.handler_welcome is not None:
-            self.handler_welcome(bot, message)
+            self.handler_welcome(bot, message, sqldb)
         bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup, parse_mode='Markdown')
 
     def default_out_handler(self, bot, message):
@@ -62,13 +63,14 @@ class State:
         bot.send_message(message.chat.id, universal_reply.DEFAULT_ANS)
         return None
 
-    def out_handler(self, bot, message):
+    def out_handler(self, bot, message, sqldb: SQLighter):
         """
         Default handler manage text messages and couldn't handle any photo/documents;
         It just apply special handler if it is not None;
         If message couldn't be handled None is returned;
         :param message:
         :param bot:
+        :param sqldb:
         :return: name of the new state;
 
         """
@@ -92,7 +94,7 @@ class State:
 
 
 class DialogGraph:
-    def __init__(self, bot, root_state: str, nodes: List[State]):
+    def __init__(self, bot, root_state: str, nodes: List[State], sqldb: SQLighter):
         """
         Instance of this class manages all the dialog flow;
         :param bot: telebot.TeleBot(token);
@@ -105,6 +107,7 @@ class DialogGraph:
         self.root_state = root_state
         self.nodes = self.make_nodes_dict(nodes)
         self.usr_states = defaultdict(dict)
+        self.sqldb = sqldb
 
     def make_nodes_dict(self, nodes):
         return {state.name: state for state in nodes}
@@ -118,8 +121,8 @@ class DialogGraph:
             self.usr_states[message.chat.id]['current_state'] = self.root_state
 
         curr_state_name = self.usr_states[message.chat.id]['current_state']
-        new_state_name = self.nodes[curr_state_name].out_handler(self.bot, message)
+        new_state_name = self.nodes[curr_state_name].out_handler(self.bot, message, self.sqldb)
 
         if new_state_name is not None:
             self.usr_states[message.chat.id]['current_state'] = new_state_name
-            self.nodes[new_state_name].welcome_handler(self.bot, message)
+            self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)

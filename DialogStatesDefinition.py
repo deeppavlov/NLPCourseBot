@@ -2,6 +2,7 @@ from DialogClasses import *
 from Sqlighter import SQLighter
 import universal_reply
 import config
+import random
 import utilities
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
@@ -28,9 +29,8 @@ ask_question_start = State(name='ASK_QUESTION_START',
 
 # ----------------------------------------------------------------------------
 
-def save_question_handler(bot, message):
-    sqlighter = SQLighter(config.bd_name)
-    sqlighter.write_question(message.chat.username, message.text)
+def save_question_handler(bot, message, sqldb):
+    sqldb.write_question(message.chat.username, message.text)
 
 
 save_question = State(name='SAVE_QUESTION',
@@ -53,8 +53,7 @@ pass_hw_num_selection = State(name='PASS_HW_NUM_SELECT',
 
 # ----------------------------------------------------------------------------
 
-def make_fake_db_record(bot, message):
-    sqldb = SQLighter(config.bd_name)
+def make_fake_db_record(bot, message, sqldb):
     sqldb.make_fake_db_record(message.chat.username, message.text)
 
 
@@ -68,7 +67,7 @@ pass_hw_chosen_num = State(name='PASS_HW_CHOSEN_NUM',
 # ----------------------------------------------------------------------------
 
 class HwUploadState(State):
-    def welcome_handler(self, bot, message):
+    def welcome_handler(self, bot, message, sqldb: SQLighter):
         username = message.chat.username
         if not message.document.file_name.endswith(config.available_hw_resolutions):
             tmp_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
@@ -78,17 +77,16 @@ class HwUploadState(State):
                                               "Напоминаю, что дз сдается в виде одного файла архива или одного Jupyter ноутбука."
                              .format(username.title(), str(config.available_hw_resolutions)), reply_markup=tmp_markup)
         else:
-            sqldb = SQLighter(config.bd_name)
             hw_num = sqldb.upd_homework(user_id=username, file_id=message.document.file_id)
             bot.send_message(message.chat.id,
                              'Уважаемый *{}*, ваш файлик был заботливо сохранен как задание {} 🐾\n'
                              .format(username.title(), hw_num),
                              reply_markup=self.reply_markup, parse_mode='Markdown')
 
-    def out_handler(self, bot, message):
+    def out_handler(self, bot, message, sqldb: SQLighter):
         for state_name, attribs in self.triggers_out.items():
             if message.content_type == 'document':
-                return self.welcome_handler(bot, message)
+                return self.welcome_handler(bot, message, sqldb)
 
             elif (message.content_type == 'text') and (message.text in attribs['phrases']):
                 return state_name
@@ -103,9 +101,9 @@ pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
 
 # ----------------------------------------------------------------------------
 
-def show_marks_table(bot, message):
-    pass
-
+def show_marks_table(bot, message, sqldb):
+    marks = sqldb.get_marks(message.chat.username)
+    print(marks)
 
 get_mark = State(name='GET_MARK',
                  triggers_out={'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
@@ -124,10 +122,16 @@ check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
 
 # ----------------------------------------------------------------------------
 
-def choose_file_and_send(bot, message):
-    sqldb = SQLighter(config.bd_name)
+def choose_file_and_send(bot, message, sqldb):
     file_ids = sqldb.get_file_ids(hw_num=message.text, number_of_files=3)
     print(file_ids)
+    if len(file_ids) > 0:
+        chosen_file = random.choice(file_ids)[0]
+        sqldb.write_check_hw_ids(message.chat.username, chosen_file)
+        bot.send_document(message.chat.id, chosen_file)
+    else:
+        print("ERROR! empty sequence")
+        pass
 
 
 check_hw_send = State(name='CHECK_HW_SEND',
@@ -139,8 +143,8 @@ check_hw_send = State(name='CHECK_HW_SEND',
 
 # ----------------------------------------------------------------------------
 
-def save_mark(bot, message):
-    pass
+def save_mark(bot, message, sqldb):
+    sqldb.save_mark(message.chat.username, message.text)
 
 
 check_hw_save_mark = State(name='CHECK_HW_SAVE_MARK',
@@ -163,7 +167,7 @@ admin_menu = State(name='ADMIN_MENU',
 
 # ----------------------------------------------------------------------------
 
-def get_questions(bot, message):
+def get_questions(bot, message, sqldb):
     pass
 
 
@@ -175,7 +179,7 @@ know_new_questions = State(name='KNOW_NEW_QUESTIONS',
 
 # ----------------------------------------------------------------------------
 
-def get_hw_stat(bot, message):
+def get_hw_stat(bot, message, sqldb):
     pass
 
 

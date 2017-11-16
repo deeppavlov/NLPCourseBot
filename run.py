@@ -3,8 +3,9 @@ from DialogClasses import DialogGraph
 import telebot
 import config
 from flask import Flask, request
+from Sqlighter import SQLighter
 
-bot = telebot.TeleBot(config.token)
+bot = telebot.TeleBot(config.token, threaded=False)
 nodes = [DialogStatesDefinition.wait_usr_interaction,
          DialogStatesDefinition.main_menu,
 
@@ -25,7 +26,8 @@ nodes = [DialogStatesDefinition.wait_usr_interaction,
          DialogStatesDefinition.check_hw_save_mark,
          DialogStatesDefinition.check_hw_send]
 
-dialogGraph = DialogGraph(bot, root_state='WAIT_USR_INTERACTION', nodes=nodes)
+sqldb = SQLighter(config.bd_name)
+dialogGraph = DialogGraph(bot, root_state='WAIT_USR_INTERACTION', nodes=nodes, sqldb=sqldb)
 
 
 @bot.message_handler(content_types=['text', 'document', 'photo'])

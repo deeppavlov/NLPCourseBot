@@ -104,13 +104,15 @@ pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
 def show_marks_table(bot, message, sqldb):
     marks = sqldb.get_marks(message.chat.username)
     if len(marks) < 1:
-        bot.send_message(message.chat.id, 'Уважаемый *{}*,'
-                                          ' ваши работы еще не были проверены ни одним разумным существом.\n'
+        bot.send_message(message.chat.id, 'Уважаемый *{}*, '
+                                          'ваши работы еще не были проверены ни одним разумным существом.\n'
                                           'Остается надеяться и верить в лучшее 🐸'.format(
             message.chat.username.title()),
                          parse_mode='Markdown')
     else:
-        ans = '*HW_NUM*\t*MARK*\n' + '\n ------ \n'.join([hw_num + '\t' + str(mark) for hw_num, date, mark in marks])
+        ans = 'Ваши оценки следующие:\n'
+        for hw_num, date, mark in marks:
+            ans = 'Для работы под номером # *' + hw_num + '*, загруженной *' + date + '* оценка: *' + str(mark)+'*\n'
         bot.send_message(message.chat.id, ans, parse_mode='Markdown')
 
 

@@ -16,7 +16,7 @@ main_menu = State(name='MAIN_MENU',
                                 'GET_MARK': {'phrases': ['🐝 Узнать оценки за дз 🐝'], 'content_type': 'text'},
                                 'CHECK_HW_NUM_SELECT': {'phrases': ['🐌 Проверить дз 🐌'], 'content_type': 'text'},
                                 'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}},
-                  hidden_states=['ADMIN_MENU'],
+                  hidden_states={'state_name': 'ADMIN_MENU', 'users_file': config.admins},
                   welcome_msg='Выберите доступное действие, пожалуйста')
 
 # ----------------------------------------------------------------------------
@@ -110,10 +110,11 @@ def show_marks_table(bot, message, sqldb):
             message.chat.username.title()),
                          parse_mode='Markdown')
     else:
-        ans = 'Ваши оценки следующие:\n'
+        ans = '_Ваши оценки следующие_\n'
         for hw_num, date, mark in marks:
-            ans = 'Для работы под номером # *' + hw_num + '*, загруженной *' + date + '* оценка: *' + str(mark)+'*\n'
+            ans += '🐛 Для работы *' + hw_num + '*, загруженной *' + date + '* оценка: *' + str(round(mark, 2)) + '*\n'
         bot.send_message(message.chat.id, ans, parse_mode='Markdown')
+        bot.send_message(message.chat.id, 'Если какой-то работы нет в списке, значит ее еще не проверяли.')
 
 
 get_mark = State(name='GET_MARK',
@@ -180,16 +181,20 @@ admin_menu = State(name='ADMIN_MENU',
 
 def get_questions(bot, message, sqldb):
     questions = sqldb.get_questions_last_week()
-    res = '*Questions for the last week*\n'
-    for user_id, question, date in questions:
-        res += '*User*: ' + user_id + ' *asked at* ' + date + ':\n_' + question + '_\n\n'
-    bot.send_message(message.chat.id, res, parse_mode='Markdown')
+    if len(questions) > 0:
+        res = '*Questions for the last week*\n'
+        for user_id, question, date in questions:
+            res += '👽 User: *' + user_id + '* asked at *' + date + '*:\n' + question + '\n\n'
+        bot.send_message(message.chat.id, res, parse_mode='Markdown')
+    else:
+        bot.send_message(message.chat.id, '_Нет ничего новенького за последние 7 дней, к сожалению_:(',
+                         parse_mode='Markdown')
 
 
 know_new_questions = State(name='KNOW_NEW_QUESTIONS',
                            triggers_out={'ADMIN_MENU': {'phrases': ['Назад в админку'], 'content_type': 'text'}},
                            handler_welcome=get_questions,
-                           welcome_msg='Это все новые вопросы')
+                           welcome_msg='Это все 👽')
 
 
 # ----------------------------------------------------------------------------

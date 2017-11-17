@@ -1,20 +1,36 @@
 # -*- coding: utf-8 -*-
 
 import sqlite3
+from sqlite3 import Error
 import config
+import os
 
 
 class SQLighter:
     def __init__(self, database_file_path):
-        self.connection = sqlite3.connect(database_file_path)
-        self.connection.isolation_level = None
-        self.cursor = self.connection.cursor()
+        if not os.path.exists(database_file_path):
+            try:
+                self.connection = sqlite3.connect(database_file_path)
+            except Error as e:
+                print(e)
+            self.cursor = self.connection.cursor()
+            self.cursor.execute("CREATE TABLE Questions ( user_id TEXT NOT NULL, "
+                                "date_added INTEGER NOT NULL, question TEXT );")
+            self.cursor.execute("CREATE TABLE hw ( user_id TEXT, hw_num TEXT, date INTEGER, file_id TEXT );")
+            self.cursor.execute("CREATE TABLE hw_checking ( file_id TEXT, user_id TEXT, mark INTEGER, "
+                                "date_checked INTEGER, date_started INTEGER );")
+            self.connection.commit()
+            self.connection.isolation_level = None
+        else:
+            self.connection = sqlite3.connect(database_file_path)
+            self.connection.isolation_level = None
+            self.cursor = self.connection.cursor()
 
     def get_questions_last_week(self):
         """ Get only fresh questions from last n days """
         return self.cursor.execute("SELECT user_id, question, datetime(q.date_added, 'unixepoch', 'localtime') "
                                    "FROM questions q "
-                                   "WHERE (q.date_added >= strftime('%s','now','-7 day'))")
+                                   "WHERE (q.date_added >= strftime('%s','now','-7 day'))").fetchall()
 
     def write_question(self, user_id, question):
         """ Insert question into BD """
@@ -56,7 +72,7 @@ class SQLighter:
                                    "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
 
     def get_marks(self, user_id):
-        return self.cursor.execute("SELECT hw.hw_num, hw.date, avg(hw_checking.mark) avg_mark "
+        return self.cursor.execute("SELECT hw.hw_num, datetime(hw.date, 'unixepoch', 'localtime'), avg(hw_checking.mark) avg_mark "
                                    "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
                                    "WHERE hw.user_id = ? "
                                    "AND hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "

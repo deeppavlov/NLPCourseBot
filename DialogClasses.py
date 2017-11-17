@@ -8,7 +8,7 @@ from Sqlighter import SQLighter
 class State:
     def __init__(self, name: str,
                  triggers_out: Dict,
-                 hidden_states: List = None,
+                 hidden_states: Dict = None,
                  welcome_msg: str = None,
                  row_width=1,
                  handler_welcome: Callable = None):
@@ -37,7 +37,7 @@ class State:
         is_markup_filled = False
         tmp_buttons = []
         for state_name, attrib in self.triggers_out.items():
-            hidden_flag = ((self.hidden_states is not None) and (state_name not in self.hidden_states)) \
+            hidden_flag = ((self.hidden_states is not None) and (state_name != self.hidden_states['state_name'])) \
                           or (self.hidden_states is None)
             if len(attrib['phrases']) > 0 and hidden_flag:
                 for txt in attrib['phrases']:
@@ -79,7 +79,13 @@ class State:
                     return state_name
 
             elif message.text in attribs['phrases']:
-                return state_name
+                if self.hidden_states is None:
+                    return state_name
+                elif state_name == self.hidden_states['state_name']:
+                    if message.chat.username in self.hidden_states['users_file']:
+                        return state_name
+                else:
+                    return state_name
 
             # the case when any text message should route to state_name
             elif (len(attribs['phrases']) == 0) and (attribs['content_type'] == 'text'):

@@ -4,6 +4,15 @@ import telebot
 import config
 from flask import Flask, request
 from Sqlighter import SQLighter
+import logging
+
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler('usr_logs.log', 'w', 'utf-8')
+handler.setFormatter = logging.Formatter('%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s')
+root_logger.addHandler(handler)
+
 
 bot = telebot.TeleBot(config.token, threaded=False)
 nodes = [DialogStatesDefinition.wait_usr_interaction,
@@ -27,7 +36,7 @@ nodes = [DialogStatesDefinition.wait_usr_interaction,
          DialogStatesDefinition.check_hw_send]
 
 sqldb = SQLighter(config.bd_name)
-dialogGraph = DialogGraph(bot, root_state='WAIT_USR_INTERACTION', nodes=nodes, sqldb=sqldb)
+dialogGraph = DialogGraph(bot, root_state='WAIT_USR_INTERACTION', nodes=nodes, sqldb=sqldb, logger=root_logger)
 
 
 @bot.message_handler(content_types=['text', 'document', 'photo'])

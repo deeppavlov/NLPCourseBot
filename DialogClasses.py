@@ -3,6 +3,7 @@ import universal_reply
 from telebot import types
 from collections import defaultdict
 from Sqlighter import SQLighter
+import logging
 
 
 class State:
@@ -98,7 +99,7 @@ class State:
 
 
 class DialogGraph:
-    def __init__(self, bot, root_state: str, nodes: List[State], sqldb: SQLighter):
+    def __init__(self, bot, root_state: str, nodes: List[State], sqldb: SQLighter, logger: logging):
         """
         Instance of this class manages all the dialog flow;
         :param bot: telebot.TeleBot(token);
@@ -112,21 +113,25 @@ class DialogGraph:
         self.nodes = self.make_nodes_dict(nodes)
         self.usr_states = defaultdict(dict)
         self.sqldb = sqldb
+        self.logger = logger
 
     def make_nodes_dict(self, nodes):
         return {state.name: state for state in nodes}
 
     def run(self, message):
+        self.logger.debug("USR: " + message.chat.username + " SAID: " + message.text)
         if message.chat.username is None:
             self.bot.send_message(message.chat.id, universal_reply.NO_USERNAME_WARNING)
             return
 
         if message.chat.id not in self.usr_states:
+            self.logger.debug("NEW USR: " + message.chat.username)
             self.usr_states[message.chat.id]['current_state'] = self.root_state
 
         curr_state_name = self.usr_states[message.chat.id]['current_state']
         new_state_name = self.nodes[curr_state_name].out_handler(self.bot, message, self.sqldb)
 
         if new_state_name is not None:
+            self.logger.debug("USR: " + message.chat.username + " NEW STATE: " + new_state_name)
             self.usr_states[message.chat.id]['current_state'] = new_state_name
             self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)

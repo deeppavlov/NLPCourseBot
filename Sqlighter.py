@@ -53,17 +53,18 @@ class SQLighter:
         return self.cursor.execute("INSERT INTO hw_checking (file_id, user_id, date_started) "
                                    "VALUES (?, ?, strftime('%s','now'))", (file_id, user_id))
 
-    def get_file_ids(self, hw_num, number_of_files):
+    def get_file_ids(self, hw_num, number_of_files, user_id):
         return self.cursor.execute("SELECT hw.file_id, count(hw_checking.file_id) checks_count "
                                    "FROM hw "
                                    "LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
                                    "WHERE hw.file_id IS NOT NULL "
-                                   "AND hw.hw_num = :hw_num "
+                                   "AND hw.hw_num = :hw_num AND hw.user_id != :usr_id "
                                    "GROUP BY hw.file_id "
                                    "ORDER BY checks_count "
                                    "LIMIT :num_files",
                                    {'hw_num': hw_num,
-                                    'num_files': number_of_files}).fetchall()
+                                    'num_files': number_of_files,
+                                    'usr_id': user_id}).fetchall()
 
     def save_mark(self, user_id, mark):
         return self.cursor.execute("UPDATE hw_checking SET mark = ?, date_checked=strftime('%s','now') "

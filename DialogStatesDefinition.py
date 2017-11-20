@@ -102,19 +102,54 @@ pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
 # ----------------------------------------------------------------------------
 
 def show_marks_table(bot, message, sqldb):
-    marks = sqldb.get_marks(message.chat.username)
-    if len(marks) < 1:
+    num_checked = sqldb.get_num_checked(message.chat.username)
+    if len(num_checked) == 0:
         bot.send_message(message.chat.id, 'Уважаемый *{}*, '
-                                          'ваши работы еще не были проверены ни одним разумным существом.\n'
-                                          'Остается надеяться и верить в лучшее 🐸'.format(
+                                          'вам нужно проверить как минимум 3 работы'
+                                          ' из каждого сданного вами задания, '
+                                          'чтобы узнать свою оценку по данному заданию. '
+                                          'На текущий момент вы не проверили ни одно задание :(.'.format(
             message.chat.username.title()),
                          parse_mode='Markdown')
     else:
-        ans = '_Ваши оценки следующие_\n'
-        for hw_num, date, mark in marks:
-            ans += '🐛 Для работы *' + hw_num + '*, загруженной *' + date + '* оценка: *' + str(round(mark, 2)) + '*\n'
-        bot.send_message(message.chat.id, ans, parse_mode='Markdown')
-        bot.send_message(message.chat.id, 'Если какой-то работы нет в списке, значит ее еще не проверяли.')
+        may_be_shown = []
+        for num, count in num_checked:
+            if count < 3:
+                bot.send_message(message.chat.id, '👻 Для того чтобы узнать оценку по заданию {}'
+                                                  ' вам нужно проверить еще вот столько [{}]'
+                                                  ' заданий этого семинара.'.format(num, 3 - count))
+            else:
+                may_be_shown.append(num)
+
+        if len(may_be_shown) == 0:
+            return
+
+        marks = sqldb.get_marks(message.chat.username)
+        if len(marks) < 1:
+            bot.send_message(message.chat.id, 'Уважаемый *{}*, '
+                                              'ваши работы еще не были проверены ни одним разумным существом.\n'
+                                              'Остается надеяться и верить в лучшее 🐸'.format(
+                message.chat.username.title()),
+                             parse_mode='Markdown')
+        else:
+            count_what_show = 0
+            ans = '_Ваши оценки следующие_\n'
+            for hw_num, date, mark in marks:
+                if hw_num in may_be_shown:
+                    count_what_show += 1
+                    ans += '🐛 Для работы *' + hw_num + '*, загруженной *' + date + '* оценка: *' + str(
+                        round(mark, 2)) + '*\n'
+            if count_what_show > 0:
+                bot.send_message(message.chat.id, ans, parse_mode='Markdown')
+                bot.send_message(message.chat.id, 'Если какой-то работы нет в списке, значит ее еще не проверяли.')
+            else:
+                bot.send_message(message.chat.id, 'Уважаемый *{}*, '
+                                                  'ваши работы по проверенным вами заданиям еще не были проверены'
+                                                  ' ни одним разумным существом.\n'
+                                                  'Остается надеяться и верить в лучшее 🐸 '
+                                                  '(_или написать оргам и заставить их проверить_)'.format(
+                    message.chat.username.title()),
+                                 parse_mode='Markdown')
 
 
 get_mark = State(name='GET_MARK',
@@ -136,7 +171,6 @@ check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
 
 def choose_file_and_send(bot, message, sqldb):
     file_ids = sqldb.get_file_ids(hw_num=message.text, number_of_files=3)
-    print(file_ids)
     if len(file_ids) > 0:
         chosen_file = random.choice(file_ids)[0]
         sqldb.write_check_hw_ids(message.chat.username, chosen_file)

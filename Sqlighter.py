@@ -71,12 +71,20 @@ class SQLighter:
                                    "(SELECT file_id FROM hw_checking "
                                    "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
 
-    def get_marks(self, user_id):
-        return self.cursor.execute("SELECT hw.hw_num, datetime(hw.date, 'unixepoch', 'localtime'), avg(hw_checking.mark) avg_mark "
+    def get_num_checked(self, user_id):
+        return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
                                    "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
-                                   "WHERE hw.user_id = ? "
-                                   "AND hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
-                                   "GROUP BY hw.date, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
+                                   "WHERE hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
+                                   "AND hw_checking.user_id = ?"
+                                   "GROUP BY hw.hw_num ORDER BY checks_count ", (user_id,)).fetchall()
+
+    def get_marks(self, user_id):
+        return self.cursor.execute(
+            "SELECT hw.hw_num, datetime(hw.date, 'unixepoch', 'localtime'), avg(hw_checking.mark) avg_mark "
+            "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
+            "WHERE hw.user_id = ? "
+            "AND hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
+            "GROUP BY hw.date, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
 
     def get_checked_works_stat(self):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "

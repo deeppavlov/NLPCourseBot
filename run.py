@@ -11,11 +11,12 @@ from Sqlighter import SQLighter
 
 import logging.handlers
 
+class DummyLogger:
+    def debug(self, _):
+        pass
 
-class NoGetPostFilter(logging.Filter):
-    def filter(self, record):
-        return not record.getMessage().startswith('https://api.telegram.org')
-
+telebot.logger = DummyLogger()
+logging.getLogger("requests").setLevel(logging.WARNING)
 
 f = logging.Formatter(fmt='%(levelname)s:%(name)s: %(message)s '
                           '(%(asctime)s; %(filename)s:%(lineno)d)',
@@ -26,12 +27,10 @@ handlers = [
                                          maxBytes=100000, backupCount=1)
 ]
 
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
+root_logger = logging.Logger('root_logger', level=logging.DEBUG)
 for h in handlers:
     h.setFormatter(f)
     h.setLevel(logging.DEBUG)
-    h.addFilter(NoGetPostFilter())
     root_logger.addHandler(h)
 
 ##############################

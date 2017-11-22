@@ -119,11 +119,15 @@ class DialogGraph:
         return {state.name: state for state in nodes}
 
     def run(self, message):
-        self.logger.debug("USR: " + message.chat.username + " SAID: " + message.text)
         if message.chat.username is None:
             self.bot.send_message(message.chat.id, universal_reply.NO_USERNAME_WARNING)
+            self.logger.debug("NONAME USR JOINED TELEBOT!!!")
             return
 
+        if message.text is not None:
+            self.logger.debug("USR: " + message.chat.username + " SAID: " + message.text)
+        else:
+            self.logger.debug("USR: " + message.chat.username + " SEND: " + message.content_type)
         if message.chat.id not in self.usr_states:
             self.logger.debug("NEW USR: " + message.chat.username)
             self.usr_states[message.chat.id]['current_state'] = self.root_state

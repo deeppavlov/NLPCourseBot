@@ -4,15 +4,39 @@ import telebot
 import config
 from flask import Flask, request
 from Sqlighter import SQLighter
-import logging
 
+###############################################
+########## LOGGING CLASS SETTINGS  ############
+###############################################
+
+import logging.handlers
+
+
+class NoGetPostFilter(logging.Filter):
+    def filter(self, record):
+        return not record.getMessage().startswith('https://api.telegram.org')
+
+
+f = logging.Formatter(fmt='%(levelname)s:%(name)s: %(message)s '
+                          '(%(asctime)s; %(filename)s:%(lineno)d)',
+                      datefmt="%Y-%m-%d %H:%M:%S")
+
+handlers = [
+    logging.handlers.RotatingFileHandler('usr_log.txt', encoding='utf8',
+                                         maxBytes=100000, backupCount=1)
+]
 
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.DEBUG)
-handler = logging.FileHandler('usr_logs.log', 'w', 'utf-8')
-handler.setFormatter = logging.Formatter('%(filename)s[LINE:%(lineno)d]# %(levelname)-8s [%(asctime)s]  %(message)s')
-root_logger.addHandler(handler)
+for h in handlers:
+    h.setFormatter(f)
+    h.setLevel(logging.DEBUG)
+    h.addFilter(NoGetPostFilter())
+    root_logger.addHandler(h)
 
+##############################
+#### END LOGGING SETTINGS ####
+##############################
 
 bot = telebot.TeleBot(config.token, threaded=False)
 nodes = [DialogStatesDefinition.wait_usr_interaction,
@@ -36,6 +60,7 @@ nodes = [DialogStatesDefinition.wait_usr_interaction,
          DialogStatesDefinition.check_hw_send]
 
 sqldb = SQLighter(config.bd_name)
+
 dialogGraph = DialogGraph(bot, root_state='WAIT_USR_INTERACTION', nodes=nodes, sqldb=sqldb, logger=root_logger)
 
 

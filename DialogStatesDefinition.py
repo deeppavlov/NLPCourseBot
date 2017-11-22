@@ -170,6 +170,7 @@ check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
 # ----------------------------------------------------------------------------
 
 def choose_file_and_send(bot, message, sqldb):
+    # TODO: do smth to fix work with empty hw set;
     file_ids = sqldb.get_file_ids(hw_num=message.text, number_of_files=3, user_id=message.chat.username)
     if len(file_ids) > 0:
         chosen_file = random.choice(file_ids)[0]

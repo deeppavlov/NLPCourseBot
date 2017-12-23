@@ -43,12 +43,15 @@ save_question = State(name='SAVE_QUESTION',
 
 # ----------------------------------------------------------------------------
 
+welcome_to_pass_msg = 'Пожалуйста, выберите номер задания для сдачи.'
+welcome_to_return_msg = 'Доступные для сдачи задания отсутствуют.'
 pass_hw_num_selection = State(name='PASS_HW_NUM_SELECT',
                               row_width=2,
                               triggers_out={'PASS_HW_CHOSEN_NUM': {'phrases': config.hw_possible_to_pass,
                                                                    'content_type': 'text'},
                                             'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
-                              welcome_msg='Пожалуйста, выберите номер задания.')
+                              welcome_msg=welcome_to_pass_msg if len(config.hw_possible_to_pass) > 0
+                                                              else welcome_to_return_msg)
 
 
 # ----------------------------------------------------------------------------

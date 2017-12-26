@@ -2,6 +2,7 @@
 
 import sqlite3
 from sqlite3 import Error
+import pandas as pd
 import config
 import os
 
@@ -93,9 +94,21 @@ class SQLighter:
                                    "WHERE hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
                                    "GROUP BY hw.hw_num ORDER BY checks_count ").fetchall()
 
+    def get_checks_for_every_work(self):
+        return self.cursor.execute("SELECT hw.hw_num, hw.user_id, hw.file_id, "
+                                   "count(hw_checking.file_id) checks, avg(hw_checking.mark) mark_avg "
+                                   "FROM hw LEFT OUTER JOIN hw_checking ON hw.file_id = hw_checking.file_id "
+                                   "WHERE hw.file_id IS NOT NULL " #AND hw_checking.mark IS NOT NULL "
+                                   "GROUP BY hw.file_id ORDER BY checks DESC ").fetchall()
+
+
     def close(self):
         self.connection.close()
 
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
+    results = sql.get_checks_for_every_work()
+    df = pd.DataFrame(data=results, index=range(len(results)), columns=["hw_num", "usr", "file_id", "checks", "mark"])
+    df.to_csv("HW_STAT.csv")
+    print(df)

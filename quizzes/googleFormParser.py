@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import urllib
 from pprint import pprint
+import json
 
 
 class GoogleFormParser:
@@ -13,6 +14,7 @@ class GoogleFormParser:
             2. 'variants' -- is an array of ans-variants; only one right;
             3. 'several_poss_vars' -- is an array of ans-variants; several may be right;
             4. 'grids' -- same as variants, but only numbers (from 1 to len(grids), only one ans right)
+            5. 'img' -- image path on file sys or url
     """
 
     def __init__(self, url=None, file_path=None):
@@ -61,16 +63,27 @@ class GoogleFormParser:
 
         return tasks
 
+    def save_json(self, path_file):
+        with open(path_file, 'w') as fn:
+            json.dump(self.get_tasks_json(), fn)
+        print("json saved to: {}".format(path_file))
+
 
 if __name__ == "__main__":
     # test url:
     gf = GoogleFormParser(
         url="https://docs.google.com/forms/d/e/1FAIpQLScrVP6urS02qm7bOAkbpwqSXBFJOSgvUi8J9X727j_zc8tacw/viewform#start=openform")
-    pprint(gf.get_tasks_json())
+    # pprint(gf.get_tasks_json())
+    gf.save_json("./quiz6.json")
+
+    # test loading
+    with open("./quiz6.json") as f:
+        lol = json.load(f)
+    pprint(lol)
 
     # test file:
-    gf2 = GoogleFormParser(file_path="NLP._Quiz6.html")
-    pprint(gf2.get_tasks_json())
+    # gf2 = GoogleFormParser(file_path="NLP._Quiz6.html")
+    # pprint(gf2.get_tasks_json())
 
     # test empty arguments:
     # gf3 = GoogleFormParser()

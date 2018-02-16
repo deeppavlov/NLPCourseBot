@@ -14,6 +14,8 @@ import logging.handlers
 class DummyLogger:
     def debug(self, _):
         pass
+    def info(self, _):
+        pass
 
 telebot.logger = DummyLogger()
 logging.getLogger("requests").setLevel(logging.WARNING)
@@ -38,8 +40,9 @@ for h in handlers:
 ##############################
 
 bot = telebot.TeleBot(config.token, threaded=False)
-nodes = [DialogStatesDefinition.wait_usr_interaction,
-         DialogStatesDefinition.main_menu,
+nodes = [DialogStatesDefinition.main_menu,
+
+         DialogStatesDefinition.take_quiz,
 
          DialogStatesDefinition.ask_question_start,
          DialogStatesDefinition.save_question,
@@ -60,13 +63,12 @@ nodes = [DialogStatesDefinition.wait_usr_interaction,
 
 sqldb = SQLighter(config.bd_name)
 
-dialogGraph = DialogGraph(bot, root_state='WAIT_USR_INTERACTION', nodes=nodes, sqldb=sqldb, logger=root_logger)
+dialogGraph = DialogGraph(bot, root_state='MAIN_MENU', nodes=nodes, sqldb=sqldb, logger=root_logger)
 
-
+@bot.callback_query_handler(lambda x: True)
 @bot.message_handler(content_types=['text', 'document', 'photo'])
 def handler(message):
     dialogGraph.run(message=message)
-
 
 if __name__ == '__main__':
     if config.WEBHOOKS_AVAIL:

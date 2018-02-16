@@ -17,7 +17,7 @@ class GoogleFormParser:
             5. 'img' -- image path on file sys or url
     """
 
-    def __init__(self, url=None, file_path=None):
+    def __init__(self, url: object = None, file_path: object = None) -> object:
 
         assert (url is not None) ^ (file_path is not None), "Only one of 2 arguments must be specified!"
 
@@ -71,10 +71,13 @@ class GoogleFormParser:
 
 if __name__ == "__main__":
     # test url:
-    gf = GoogleFormParser(
-        url="https://docs.google.com/forms/d/e/1FAIpQLScrVP6urS02qm7bOAkbpwqSXBFJOSgvUi8J9X727j_zc8tacw/viewform#start=openform")
-    # pprint(gf.get_tasks_json())
-    gf.save_json("./quiz6.json")
+    # gf = GoogleFormParser(
+    #     url="https://docs.google.com/forms/d/e/1FAIpQLScrVP6urS02qm7bOAkbpwqSXBFJOSgvUi8J9X727j_zc8tacw/viewform#start=openform")
+    # # pprint(gf.get_tasks_json())
+    # gf.save_json("./quiz6.json")
+
+    gf = GoogleFormParser(file_path='NLP.Quiz2.html')
+    gf.save_json("./quiz2.json")
 
     # test loading
     with open("./quiz6.json") as f:

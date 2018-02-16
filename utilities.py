@@ -1,6 +1,6 @@
 import requests
 import os
-import config
+# import config
 import telebot
 
 
@@ -16,6 +16,19 @@ def download_file(bot, file_id, folder_name, filename):
         for chunk in file.iter_content(chunk_size=1024):
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
+
+def download_picture(pic_url, pic_path):
+    with open(pic_path, 'wb') as handle:
+        response = requests.get(pic_url, stream=True)
+
+        if not response.ok:
+            print(response)
+
+        for block in response.iter_content(1024):
+            if not block:
+                break
+            handle.write(block)
+
 
 
 if __name__ == '__main__':

@@ -3,10 +3,10 @@ from Sqlighter import SQLighter
 import universal_reply
 import config
 import random
+from quizzes.QuizClasses import Quiz
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
-                             triggers_out={'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}},
-                             welcome_msg='')
+                             triggers_out={'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}})
 # ----------------------------------------------------------------------------
 
 main_menu = State(name='MAIN_MENU',
@@ -15,9 +15,20 @@ main_menu = State(name='MAIN_MENU',
                                                        'content_type': 'text'},
                                 'GET_MARK': {'phrases': ['🐝 Узнать оценки за дз 🐝'], 'content_type': 'text'},
                                 'CHECK_HW_NUM_SELECT': {'phrases': ['🐌 Проверить дз 🐌'], 'content_type': 'text'},
-                                'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}},
+                                'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'},
+                                'TAKE_QUIZ': {'phrases': ['Сдать квиз'], 'content_type': 'text'}},
                   hidden_states={'state_name': 'ADMIN_MENU', 'users_file': config.admins},
                   welcome_msg='Выберите доступное действие, пожалуйста')
+
+# ----------------------------------------------------------------------------
+
+# TODO: don't know how to be with bot..
+
+quiz = Quiz(config.quiz_name, quiz_json_path=config.quiz_path)
+
+take_quiz = State(name='TAKE_QUIZ',
+                  handler_welcome=quiz.run,
+                  triggers_out={'TAKE_QUIZ': {'phrases': [], 'content_type': 'text'}})
 
 # ----------------------------------------------------------------------------
 
@@ -252,3 +263,7 @@ see_hw_stat = State(name='SEE_HW_STAT',
                     triggers_out={'ADMIN_MENU': {'phrases': ['Назад в админку'], 'content_type': 'text'}},
                     handler_welcome=get_hw_stat,
                     welcome_msg='Это все что есть проверенного.\nЕсли какого номера тут нет, значит его не проверили.')
+
+# ----------------------------------------------------------------------------
+
+

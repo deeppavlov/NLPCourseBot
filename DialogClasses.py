@@ -52,8 +52,12 @@ class State:
 
     def welcome_handler(self, bot, message, sqldb: SQLighter):
         if self.handler_welcome is not None:
-            self.handler_welcome(bot, message, sqldb)
-        bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup, parse_mode='Markdown')
+            res = self.handler_welcome(bot, message, sqldb)
+        else:
+            res = None
+        if self.welcome_msg:
+            bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup, parse_mode='Markdown')
+        return res
 
     def default_out_handler(self, bot, message):
         if message.text == '/start':
@@ -119,6 +123,18 @@ class DialogGraph:
         return {state.name: state for state in nodes}
 
     def run(self, message):
+        if isinstance(message, types.CallbackQuery):
+            chat_id = message.from_user.id
+            state_name = self.usr_states[chat_id]['current_state']
+            res = self.nodes[state_name].welcome_handler(self.bot, message, self.sqldb)
+            if res == 'end':
+                print('It seems, the quiz submitted!')
+                self.usr_states[chat_id]['current_state'] = self.root_state
+                self.nodes[self.root_state].welcome_handler(self.bot, message, self.sqldb)
+                return
+            else:
+                return
+
         if message.chat.username is None:
             self.bot.send_message(message.chat.id, universal_reply.NO_USERNAME_WARNING)
             self.logger.debug("NONAME USR JOINED TELEBOT!!!")

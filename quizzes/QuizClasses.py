@@ -3,6 +3,8 @@ from telebot import types
 import telebot
 from collections import defaultdict
 from utilities import download_picture
+import config
+import os
 
 
 class QuizQuestion:
@@ -30,7 +32,7 @@ class QuizQuestion:
 
     def _check_img_url(self):
         if 'https' in self.img_path:
-            new_path = './pics/img_{}'.format(self.name)
+            new_path = os.path.join(config.pics_path, './img_{}'.format(self.name))
             download_picture(self.img_path, new_path)
             self.img_path = new_path
 
@@ -43,7 +45,7 @@ class QuizQuestion:
                 self.variants_one[i] = self.variants_one[i].replace('*', '×')
 
     def create_text_and_buttons(self):
-        self.text = self.name + '\n' + self.question_text + '\n\n'
+        self.text = '*' + self.name + '*' + '\n' + '_' + self.question_text + '_' + '\n\n'
         if self.ask_written:
             self.text += '*Please, write an answer by yourself.*' + '\n\n'
             self.buttons_text = None
@@ -63,6 +65,12 @@ class QuizQuestion:
         elif self.grids:
             self.text += '*Please, choose only one right answer.*' + '\n\n'
             self.buttons_text = [str(i) for i in self.grids]
+
+        if self.img_path:
+            self.text += 'See picture below.\n'
+
+        if self.is_last:
+            self.text += '*Attention! After submitting nothing can be changed.*'
 
         if self.buttons_text:
             self.keyboard = self.create_inline_kb(self.buttons_text)
@@ -135,10 +143,13 @@ class QuizQuestion:
                 reply_markup=self.keyboard,
                 parse_mode=self.parse_mode)
         if (self.img_path) and (not self.img_sent_dict[chat_id]):
+            bot.send_message(chat_id=chat_id,
+                             text='Picture for the _{}_'.format(self.name),
+                             parse_mode=self.parse_mode)
             with open(self.img_path, 'rb') as photo:
                 # TODO: insert in DB file id to send it quicker to others
                 self.img_sent_dict[chat_id] = True
-                bot.send_photo(chat_id, photo)
+                bot.send_photo(chat_id=chat_id, photo=photo)
 
     def show_current(self, bot, chat_id):
         """
@@ -148,7 +159,7 @@ class QuizQuestion:
         :return:
         """
         # TODO: do smth to show adequate answers;
-        answers = self.text + '\n\n' + '🍭 Your ans:' + str(self.usr_dict[chat_id])
+        answers = self.text + '\n' + '🍭 Your answer: ' + str(self.usr_dict[chat_id])
         bot.send_message(chat_id, answers, parse_mode=self.parse_mode)
 
     def callback_handler(self, bot, c):
@@ -206,9 +217,7 @@ class Quiz:
             for i, d in enumerate(self.json_array)]
         self.callbacks_setted = False
         self.usersteps = dict()
-
-    def _set_callback_handler(self, bot):
-        self.run = bot.callback_query_handler(func=lambda x: True)(self.run)
+        self.usr_submitted = defaultdict(bool)
 
     def get_usr_step(self, chat_id):
         if chat_id not in self.usersteps:
@@ -246,7 +255,7 @@ class Quiz:
             self.questions[usr_step].callback_handler(bot, c)
         return 'done'
 
-    def collect_to_db(self, chat_id, sqlighter):
+    def collect_to_db(self, username, chat_id, sqlighter):
         """
         collect all question answers for chat_id and write them to db
         :return: None
@@ -268,19 +277,26 @@ class Quiz:
         if isinstance(message, types.CallbackQuery):
             response = self.callback_query_handler(message, bot)
             if response == 'submit':
-                self.collect_to_db(message.from_user.id, sqlighter)
+                self.collect_to_db(username=message.from_user.username,
+                                   chat_id=message.from_user.id, sqlighter=sqlighter)
+                self.usr_submitted[message.from_user.id] = True
                 bot.edit_message_text(chat_id=message.from_user.id,
                                       message_id=message.message.message_id,
                                       text='💫 Thank you! The quiz was successfully submitted! 🌝')
-                print("return 'end' ")
                 return 'end'
             else:
-                print("return 'continue'")
                 return 'continue'
 
         else:
             chat_id = message.chat.id
+            if self.usr_submitted[chat_id]:
+                bot.send_message(chat_id=chat_id,
+                                 text="Sorry, you have already submitted {} ~_~\"".format(self.name))
+                return 'end'
             if chat_id not in self.usersteps:
+                bot.send_message(chat_id=chat_id,
+                                 text="Welcome to *{}*".format(self.name),
+                                 parse_mode="Markdown")
                 usr_step = self.get_usr_step(chat_id)
                 self.questions[usr_step].show_asking(bot, chat_id, edit=False)
             else:
@@ -289,4 +305,3 @@ class Quiz:
                     self.questions[usr_step].save_written_answer(message.text, chat_id)
                     bot.send_message(chat_id=chat_id, text='Your answer has been saved! ✨')
         return 'continue'
-

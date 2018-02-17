@@ -6,8 +6,9 @@ token = os.environ['TOKEN']
 hw_possible_to_pass = ["Sem4", "Sem5"]
 hw_possible_to_check = ["Sem1", "Sem2", "Sem4", "Sem5"]
 admins = ['fogside', 'madrugado']
-quiz_name = 'quiz 2'
-quiz_path = './quizzes/quiz2.json'
+quiz_name = 'quiz 6'
+quiz_path = './quizzes/quiz6.json'
+pics_path = './quizzes/pics'
 
 marks = [str(i) for i in range(1, 6)]
 available_hw_resolutions = ('zip', 'rar', '7z', 'tar', 'tar.bz2', 'tar.gz', 'tar.xz', 'ipynb')

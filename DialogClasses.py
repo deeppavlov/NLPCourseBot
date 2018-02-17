@@ -130,7 +130,6 @@ class DialogGraph:
             if res == 'end':
                 print('It seems, the quiz submitted!')
                 self.usr_states[chat_id]['current_state'] = self.root_state
-                self.nodes[self.root_state].welcome_handler(self.bot, message, self.sqldb)
                 return
             else:
                 return
@@ -154,4 +153,6 @@ class DialogGraph:
         if new_state_name is not None:
             self.logger.debug("USR: " + message.chat.username + " NEW STATE: " + new_state_name)
             self.usr_states[message.chat.id]['current_state'] = new_state_name
-            self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)
+            res = self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)
+            if res == 'end':
+                self.usr_states[message.chat.id]['current_state'] = self.root_state

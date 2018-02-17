@@ -1,11 +1,10 @@
 import json
 from telebot import types
-import telebot
 from collections import defaultdict
 from utilities import download_picture
 import config
 import os
-
+from copy import deepcopy
 
 class QuizQuestion:
     def __init__(self, name, question_dict, last=False, first=False, parse_mode='Markdown', tick_symbol='💎️'):
@@ -21,7 +20,7 @@ class QuizQuestion:
         self.variants_multiple = question_dict['several_poss_vars'] if len(
             question_dict['several_poss_vars']) > 0 else None
         self.ask_written = False if (self.variants_one or self.variants_multiple or self.grids) else True
-        self.usr_dict = dict() if self.variants_one else defaultdict(list)
+        self.usr_answers = dict() if self.variants_one else defaultdict(list)
         self.is_last = last
         self.is_first = first
         self.parse_mode = parse_mode
@@ -29,6 +28,7 @@ class QuizQuestion:
             self._edit_markdown_ans()
         self.tick_symbol = tick_symbol
         self.create_text_and_buttons()
+        self.usr_buttons = defaultdict(lambda: deepcopy(self.default_buttons))
 
     def _check_img_url(self):
         if 'https' in self.img_path:
@@ -48,34 +48,29 @@ class QuizQuestion:
         self.text = '*' + self.name + '*' + '\n' + '_' + self.question_text + '_' + '\n\n'
         if self.ask_written:
             self.text += '*Please, write an answer by yourself.*' + '\n\n'
-            self.buttons_text = None
+            self.default_buttons = None
 
         elif self.variants_one:
             self.text += '*Please, choose only one right answer.*' + '\n\n'
             for i, v in enumerate(self.variants_one):
                 self.text += str(i) + ') ' + v + '\n'
-            self.buttons_text = [str(i) for i in range(0, len(self.variants_one))]
+            self.default_buttons = [str(i) for i in range(0, len(self.variants_one))]
 
         elif self.variants_multiple:
             self.text += '*Please, mark all correct statements.*' + '\n\n'
             for i, v in enumerate(self.variants_multiple):
                 self.text += str(i) + ') ' + v + '\n'
-            self.buttons_text = [str(i) for i in range(0, len(self.variants_multiple))]
+            self.default_buttons = [str(i) for i in range(0, len(self.variants_multiple))]
 
         elif self.grids:
             self.text += '*Please, choose only one right answer.*' + '\n\n'
-            self.buttons_text = [str(i) for i in self.grids]
+            self.default_buttons = [str(i) for i in self.grids]
 
         if self.img_path:
-            self.text += 'See picture below.\n'
+            self.text += 'See the picture below.\n'
 
         if self.is_last:
             self.text += '*Attention! After submitting nothing can be changed.*'
-
-        if self.buttons_text:
-            self.keyboard = self.create_inline_kb(self.buttons_text)
-        else:
-            self.keyboard = self.create_inline_kb()
 
     def create_inline_kb(self, arr_text=None):
         if arr_text:
@@ -85,6 +80,11 @@ class QuizQuestion:
         return kb
 
     def _create_inline_kb(self, arr_text=None, arr_callback_data=None, row_width=5):
+        print('name: ', self.name)
+        print('Received arr_text: ', arr_text)
+        print('USR_BUTTONS: ', self.usr_buttons)
+        print('self.default_buttons: ', self.default_buttons)
+        print('-' * 10)
         keyboard = types.InlineKeyboardMarkup(row_width=row_width)
         if arr_text and arr_callback_data:
             keyboard.add(
@@ -107,7 +107,7 @@ class QuizQuestion:
 
         return keyboard
 
-    def tick_ans_in_kb(self, ans, remove=False):
+    def tick_ans_in_kb(self, ans, chat_id, remove=False):
         """
         Add ✔️ to ans; Just change self.buttons_text
         :param multiple:
@@ -115,9 +115,9 @@ class QuizQuestion:
         :return:
         """
         if not remove:
-            self.buttons_text[int(ans)] += self.tick_symbol
+            self.usr_buttons[chat_id][int(ans)] += self.tick_symbol
         else:
-            self.buttons_text[int(ans)] = self.buttons_text[int(ans)].replace(self.tick_symbol, '')
+            self.usr_buttons[chat_id][int(ans)] = self.usr_buttons[chat_id][int(ans)].replace(self.tick_symbol, '')
 
     def show_asking(self, bot, chat_id, message_id=None, edit=False):
         """
@@ -126,21 +126,25 @@ class QuizQuestion:
         :param msg:
         :return:
         """
-        if chat_id not in self.usr_dict:
+        if chat_id not in self.usr_answers:
+            # add new user to dict with buttons
+            _ = self.usr_buttons[chat_id]  # just by adding element to defaultdict
             if self.ask_written:
-                self.usr_dict[chat_id] = ''
+                self.usr_answers[chat_id] = ''
 
             elif self.variants_one:
-                self.usr_dict[chat_id] = None
+                self.usr_answers[chat_id] = None
 
         if not edit:
-            bot.send_message(chat_id, self.text, reply_markup=self.keyboard, parse_mode=self.parse_mode)
+            bot.send_message(chat_id, self.text,
+                             reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
+                             parse_mode=self.parse_mode)
         else:
             bot.edit_message_text(
                 chat_id=chat_id,
                 message_id=message_id,
                 text=self.text,
-                reply_markup=self.keyboard,
+                reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
                 parse_mode=self.parse_mode)
         if (self.img_path) and (not self.img_sent_dict[chat_id]):
             bot.send_message(chat_id=chat_id,
@@ -159,7 +163,7 @@ class QuizQuestion:
         :return:
         """
         # TODO: do smth to show adequate answers;
-        answers = self.text + '\n' + '🍭 Your answer: ' + str(self.usr_dict[chat_id])
+        answers = self.text + '\n' + '🍭 Your answer: ' + str(self.usr_answers[chat_id])
         bot.send_message(chat_id, answers, parse_mode=self.parse_mode)
 
     def callback_handler(self, bot, c):
@@ -173,30 +177,30 @@ class QuizQuestion:
 
         chat_id = c.from_user.id
         if self.variants_one:
-            if self.usr_dict[chat_id] != ans:
+            if self.usr_answers[chat_id] != ans:
                 edit = True
-                if self.usr_dict[chat_id] is not None:
-                    self.tick_ans_in_kb(self.usr_dict[chat_id], remove=True)
-                self.tick_ans_in_kb(ans, remove=False)
-                self.usr_dict[chat_id] = ans
+                if self.usr_answers[chat_id] is not None:
+                    self.tick_ans_in_kb(self.usr_answers[chat_id], chat_id, remove=True)
+                self.tick_ans_in_kb(ans, chat_id, remove=False)
+                self.usr_answers[chat_id] = ans
 
         elif self.variants_multiple:
             edit = True
-            if ans in self.usr_dict[chat_id]:
-                self.usr_dict[chat_id].remove(ans)
-                self.tick_ans_in_kb(ans, remove=True)
+            if ans in self.usr_answers[chat_id]:
+                self.usr_answers[chat_id].remove(ans)
+                self.tick_ans_in_kb(ans, chat_id, remove=True)
             else:
-                self.usr_dict[chat_id].append(ans)
-                self.tick_ans_in_kb(ans, remove=False)
+                self.usr_answers[chat_id].append(ans)
+                self.tick_ans_in_kb(ans, chat_id, remove=False)
 
         if edit:
-            self.keyboard = self.create_inline_kb(self.buttons_text)
+            keyboard = self.create_inline_kb(self.usr_buttons[chat_id])
             bot.edit_message_reply_markup(chat_id=chat_id,
                                           message_id=c.message.message_id,
-                                          reply_markup=self.keyboard)
+                                          reply_markup=keyboard)
 
     def save_written_answer(self, text, chat_id):
-        self.usr_dict[chat_id] = text
+        self.usr_answers[chat_id] = text
 
     def get_ans(self, username):
         """

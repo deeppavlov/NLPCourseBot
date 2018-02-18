@@ -10,6 +10,7 @@ wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
 # ----------------------------------------------------------------------------
 
 main_menu = State(name='MAIN_MENU',
+                  row_width=2,
                   triggers_out={'PASS_HW_NUM_SELECT': {'phrases': ['🐟 Сдать дз 🐠'], 'content_type': 'text'},
                                 'ASK_QUESTION_START': {'phrases': ['🦉 Задать вопрос к семинару 🦉'],
                                                        'content_type': 'text'},
@@ -62,7 +63,7 @@ pass_hw_num_selection = State(name='PASS_HW_NUM_SELECT',
                                                                    'content_type': 'text'},
                                             'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
                               welcome_msg=welcome_to_pass_msg if len(config.hw_possible_to_pass) > 0
-                                                              else welcome_to_return_msg)
+                              else welcome_to_return_msg)
 
 
 # ----------------------------------------------------------------------------
@@ -173,11 +174,13 @@ get_mark = State(name='GET_MARK',
 
 # ----------------------------------------------------------------------------
 
+welcome_check_hw = 'Выберите номер задания для проверки' if len(config.hw_possible_to_check) > 0 \
+    else 'Нет доступных для проверки заданий. Выпейте чаю, отдохните.'
 check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
                                triggers_out={'CHECK_HW_SEND': {'phrases': config.hw_possible_to_check,
                                                                'content_type': 'text'},
                                              'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
-                               welcome_msg='Выберите номер задания для проверки',
+                               welcome_msg=welcome_check_hw,
                                row_width=2)
 
 
@@ -185,6 +188,8 @@ check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
 
 def choose_file_and_send(bot, message, sqldb):
     # TODO: do smth to fix work with empty hw set;
+    # TODO: OH MY GOD! people should check only work that they have done!!!!
+
     file_ids = sqldb.get_file_ids(hw_num=message.text, number_of_files=3, user_id=message.chat.username)
     if len(file_ids) > 0:
         chosen_file = random.choice(file_ids)[0]
@@ -265,5 +270,3 @@ see_hw_stat = State(name='SEE_HW_STAT',
                     welcome_msg='Это все что есть проверенного.\nЕсли какого номера тут нет, значит его не проверили.')
 
 # ----------------------------------------------------------------------------
-
-

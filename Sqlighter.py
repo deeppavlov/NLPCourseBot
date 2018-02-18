@@ -17,9 +17,27 @@ class SQLighter:
             self.cursor = self.connection.cursor()
             self.cursor.execute("CREATE TABLE Questions ( user_id TEXT NOT NULL, "
                                 "date_added INTEGER NOT NULL, question TEXT );")
-            self.cursor.execute("CREATE TABLE hw ( user_id TEXT, hw_num TEXT, date INTEGER, file_id TEXT );")
+
+            self.cursor.execute("CREATE TABLE hw ( user_id TEXT, hw_num TEXT, "
+                                "date_added INTEGER, file_id TEXT );")
+
             self.cursor.execute("CREATE TABLE hw_checking ( file_id TEXT, user_id TEXT, mark INTEGER, "
                                 "date_checked INTEGER, date_started INTEGER );")
+
+            self.cursor.execute("CREATE TABLE quizzes ( user_id	TEXT, "
+                                "question_name	TEXT, "
+                                "quiz_name	TEXT, "
+                                "question_text TEXT, "
+                                "true_ans TEXT, "
+                                "is_right	INTEGER, "
+                                "usr_answer	TEXT, "
+                                "date_added INTEGER, "
+                                "id INTEGER PRIMARY KEY AUTOINCREMENT );")
+            self.cursor.execute("CREATE TABLE quizzes_checking ( checker_user_id TEXT, "
+                                "id_quizzes INTEGER, "
+                                "date_started INTEGER, "
+                                "date_checked INTEGER, "
+                                "is_right INTEGER);")
             self.connection.commit()
             self.connection.isolation_level = None
         else:
@@ -40,14 +58,14 @@ class SQLighter:
 
     def make_fake_db_record(self, user_id, hw_number):
         """ Make empty record for this hw_number """
-        self.cursor.execute("INSERT INTO hw (user_id, hw_num, date)"
+        self.cursor.execute("INSERT INTO hw (user_id, hw_num, date_added)"
                             " VALUES (?, ?, strftime('%s','now'))", (user_id, hw_number))
 
     def upd_homework(self, user_id, file_id):
         """ UPD the latest record of user_id with file_id """
-        self.cursor.execute("UPDATE hw SET file_id = ?, date = strftime('%s','now') "
+        self.cursor.execute("UPDATE hw SET file_id = ?, date_added = strftime('%s','now') "
                             "WHERE user_id = ? AND hw_num = "
-                            "(SELECT hw_num FROM hw WHERE user_id = ? ORDER BY date DESC LIMIT 1)",
+                            "(SELECT hw_num FROM hw WHERE user_id = ? ORDER BY date_added DESC LIMIT 1)",
                             (file_id, user_id, user_id))
 
     def write_check_hw_ids(self, user_id, file_id):
@@ -82,11 +100,11 @@ class SQLighter:
 
     def get_marks(self, user_id):
         return self.cursor.execute(
-            "SELECT hw.hw_num, datetime(hw.date, 'unixepoch', 'localtime'), avg(hw_checking.mark) avg_mark "
+            "SELECT hw.hw_num, datetime(hw.date_added, 'unixepoch', 'localtime'), avg(hw_checking.mark) avg_mark "
             "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
             "WHERE hw.user_id = ? "
             "AND hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
-            "GROUP BY hw.date, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
+            "GROUP BY hw.date_added, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
 
     def get_checked_works_stat(self):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
@@ -98,9 +116,19 @@ class SQLighter:
         return self.cursor.execute("SELECT hw.hw_num, hw.user_id, hw.file_id, "
                                    "count(hw_checking.file_id) checks, avg(hw_checking.mark) mark_avg "
                                    "FROM hw LEFT OUTER JOIN hw_checking ON hw.file_id = hw_checking.file_id "
-                                   "WHERE hw.file_id IS NOT NULL " #AND hw_checking.mark IS NOT NULL "
+                                   "WHERE hw.file_id IS NOT NULL "  # AND hw_checking.mark IS NOT NULL "
                                    "GROUP BY hw.file_id ORDER BY checks DESC ").fetchall()
 
+    def write_quiz_ans(self, user_id: str,
+                       quiz_name: str, question_name: str,
+                       is_right: bool, usr_ans: str,
+                       question_text: str, true_ans: str):
+        return self.cursor.execute("INSERT INTO quizzes (user_id, quiz_name,"
+                                   " question_name, is_right, usr_answer,"
+                                   " question_text, true_ans, date_added) "
+                                   "VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))",
+                                   (user_id, quiz_name, question_name,
+                                    is_right, usr_ans, question_text, true_ans))
 
     def close(self):
         self.connection.close()

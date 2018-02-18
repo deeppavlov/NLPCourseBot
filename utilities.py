@@ -1,6 +1,6 @@
 import requests
 import os
-# import config
+import config
 import telebot
 
 

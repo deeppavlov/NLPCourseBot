@@ -5,7 +5,6 @@ from collections import defaultdict
 from Sqlighter import SQLighter
 import logging
 
-
 class State:
     def __init__(self, name: str,
                  triggers_out: Dict,
@@ -125,6 +124,9 @@ class DialogGraph:
     def run(self, message):
         if isinstance(message, types.CallbackQuery):
             chat_id = message.from_user.id
+            if chat_id not in self.usr_states:
+                self.usr_states[chat_id]['current_state'] = self.root_state
+                return
             state_name = self.usr_states[chat_id]['current_state']
             res = self.nodes[state_name].welcome_handler(self.bot, message, self.sqldb)
             if res == 'end':

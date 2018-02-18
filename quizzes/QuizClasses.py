@@ -6,23 +6,31 @@ import config
 import os
 from copy import deepcopy
 
+
 class QuizQuestion:
     def __init__(self, name, question_dict, last=False, first=False, parse_mode='Markdown', tick_symbol='💎️'):
         self.name = name
         self.question_text = question_dict['text']
-        self.img_path = question_dict['img'] if len(question_dict['img']) > 0 else None
-        if self.img_path:
-            self._check_img_url()
-        self.img_sent_dict = defaultdict(bool)
+        self.true_ans = question_dict['true_ans']
 
         self.grids = question_dict['grids']
         self.variants_one = question_dict['variants'] if len(question_dict['variants']) > 0 else None
         self.variants_multiple = question_dict['several_poss_vars'] if len(
             question_dict['several_poss_vars']) > 0 else None
         self.ask_written = False if (self.variants_one or self.variants_multiple or self.grids) else True
+
+        assert self.ask_written or (self.true_ans is not None),\
+            "true_ans must be specified if not ask_written!"
+
         self.usr_answers = dict() if self.variants_one else defaultdict(list)
         self.is_last = last
         self.is_first = first
+
+        self.img_path = question_dict['img'] if len(question_dict['img']) > 0 else None
+        if self.img_path:
+            self._check_img_url()
+        self.img_sent_dict = defaultdict(bool)
+
         self.parse_mode = parse_mode
         if self.parse_mode == 'Markdown':
             self._edit_markdown_ans()
@@ -80,11 +88,7 @@ class QuizQuestion:
         return kb
 
     def _create_inline_kb(self, arr_text=None, arr_callback_data=None, row_width=5):
-        print('name: ', self.name)
-        print('Received arr_text: ', arr_text)
-        print('USR_BUTTONS: ', self.usr_buttons)
-        print('self.default_buttons: ', self.default_buttons)
-        print('-' * 10)
+
         keyboard = types.InlineKeyboardMarkup(row_width=row_width)
         if arr_text and arr_callback_data:
             keyboard.add(
@@ -127,12 +131,12 @@ class QuizQuestion:
         :return:
         """
         if chat_id not in self.usr_answers:
-            # add new user to dict with buttons
-            _ = self.usr_buttons[chat_id]  # just by adding element to defaultdict
+            # add new user to dict with buttons...
+            _ = self.usr_buttons[chat_id]  # ...just by adding element to defaultdict
             if self.ask_written:
                 self.usr_answers[chat_id] = ''
 
-            elif self.variants_one:
+            elif self.variants_one or self.grids:
                 self.usr_answers[chat_id] = None
 
         if not edit:
@@ -162,8 +166,12 @@ class QuizQuestion:
         :param msg:
         :return:
         """
-        # TODO: do smth to show adequate answers;
-        answers = self.text + '\n' + '🍭 Your answer: ' + str(self.usr_answers[chat_id])
+        if self.grids:
+            add = str(self.grids[int(self.usr_answers[chat_id])]) if self.usr_answers[chat_id] else 'None'
+            answers = self.text + '\n' + '🍭 Your answer: ' + add
+        else:
+            answers = self.text + '\n' + '🍭 Your answer: ' + str(self.usr_answers[chat_id])
+
         bot.send_message(chat_id, answers, parse_mode=self.parse_mode)
 
     def callback_handler(self, bot, c):
@@ -176,7 +184,7 @@ class QuizQuestion:
         edit = False
 
         chat_id = c.from_user.id
-        if self.variants_one:
+        if self.variants_one or self.grids:
             if self.usr_answers[chat_id] != ans:
                 edit = True
                 if self.usr_answers[chat_id] is not None:
@@ -202,13 +210,22 @@ class QuizQuestion:
     def save_written_answer(self, text, chat_id):
         self.usr_answers[chat_id] = text
 
-    def get_ans(self, username):
+    def get_ans(self, chat_id):
         """
-        Return ans of username
-        :return:
+        Return data for chat_id
+        :return: question_name, is_right, usr_ans, question_text, true_ans
         """
-        pass
+        ans = self.usr_answers[chat_id]
+        is_right = None
+        if self.ask_written:
+            return self.name, is_right, ans, self.text, self.true_ans
 
+        if self.variants_multiple:
+            is_right = frozenset([int(a) for a in self.true_ans]) == frozenset([int(a) for a in ans]) if ans else False
+        else:
+            is_right = int(self.true_ans) == int(ans) if ans else False
+        ans = str(ans) if ans else ans
+        return self.name, int(is_right), ans, self.text, self.true_ans
 
 class Quiz:
     def __init__(self, name, quiz_json_path):
@@ -259,38 +276,51 @@ class Quiz:
             self.questions[usr_step].callback_handler(bot, c)
         return 'done'
 
-    def collect_to_db(self, username, chat_id, sqlighter):
+    def collect_to_db(self, user_id, chat_id, sqlighter):
         """
         collect all question answers for chat_id and write them to db
         :return: None
         """
-        # TODO:
-        # 1. What will be the db?
-        # 2. What should we write to db?
-        pass
+        for q in self.questions:
+            question_name, is_right, usr_ans, question_text, true_ans = q.get_ans(chat_id)
+            sqlighter.write_quiz_ans(user_id=user_id,
+                                     quiz_name=self.name,
+                                     question_name=question_name,
+                                     is_right=is_right,
+                                     usr_ans=usr_ans,
+                                     question_text=question_text,
+                                     true_ans=true_ans)
 
     def run(self, bot, message, sqlighter):
         """
         Handle all messages including callbacks
         :param message: 
-        :return:
+        :return: 'end' or 'continue'
         """
-        # if not self.callbacks_setted:
-        #     self._set_callback_handler(bot)
-
+        if config.quiz_closed:
+            if(isinstance(message, types.CallbackQuery)):
+                bot.edit_message_text(chat_id=message.from_user.id,
+                                      message_id=message.message.message_id,
+                                      text='🎈 Finished! 🎉')
+                bot.send_message(chat_id=message.from_user.id, text='Квиз закрыт для сдачи.')
+            else:
+                bot.reply_to(message, "Квиз закрыт для сдачи. 🌝\n"
+                                  "Приходите позже на следующий квиз.")
+            return 'end'
         if isinstance(message, types.CallbackQuery):
             response = self.callback_query_handler(message, bot)
             if response == 'submit':
-                self.collect_to_db(username=message.from_user.username,
+                self.collect_to_db(user_id=message.from_user.username,
                                    chat_id=message.from_user.id, sqlighter=sqlighter)
                 self.usr_submitted[message.from_user.id] = True
                 bot.edit_message_text(chat_id=message.from_user.id,
                                       message_id=message.message.message_id,
-                                      text='💫 Thank you! The quiz was successfully submitted! 🌝')
+                                      text='🎈 Finished! 🎉')
+                bot.send_message(chat_id=message.from_user.id,
+                                 text='💫 Thank you! The quiz was successfully submitted! 🌝')
                 return 'end'
             else:
                 return 'continue'
-
         else:
             chat_id = message.chat.id
             if self.usr_submitted[chat_id]:

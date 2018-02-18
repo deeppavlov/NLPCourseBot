@@ -59,6 +59,7 @@ class GoogleFormParser:
             task['variants'] = variants
             task['several_poss_vars'] = several_poss_vars
             task['img'] = imgs
+            task['true_ans'] = None
             tasks.append(task)
 
         return tasks
@@ -76,8 +77,8 @@ if __name__ == "__main__":
     # # pprint(gf.get_tasks_json())
     # gf.save_json("./quiz6.json")
 
-    gf = GoogleFormParser(file_path='NLP.Quiz2.html')
-    gf.save_json("./quiz2.json")
+    gf = GoogleFormParser(file_path='NLP._Quiz6.html')
+    gf.save_json("./quiz6.json")
 
     # test loading
     with open("./quiz6.json") as f:

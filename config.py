@@ -3,11 +3,12 @@ import os
 
 token = os.environ['TOKEN']
 
-hw_possible_to_pass = ["Sem4", "Sem5"]
-hw_possible_to_check = ["Sem1", "Sem2", "Sem4", "Sem5"]
+hw_possible_to_pass = []
+hw_possible_to_check = []
 admins = ['fogside', 'madrugado']
 quiz_name = 'quiz 6'
-quiz_path = './quizzes/quiz6.json'
+quiz_path = './quizzes/quiz1.json'
+quiz_closed = False
 pics_path = './quizzes/pics'
 
 marks = [str(i) for i in range(1, 6)]

@@ -17,19 +17,42 @@ main_menu = State(name='MAIN_MENU',
                                 'GET_MARK': {'phrases': ['🐝 Узнать оценки за дз 🐝'], 'content_type': 'text'},
                                 'CHECK_HW_NUM_SELECT': {'phrases': ['🐌 Проверить дз 🐌'], 'content_type': 'text'},
                                 'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'},
-                                'TAKE_QUIZ': {'phrases': ['Сдать квиз'], 'content_type': 'text'}},
+                                'TAKE_QUIZ': {'phrases': [universal_reply.quiz_enter], 'content_type': 'text'}},
                   hidden_states={'state_name': 'ADMIN_MENU', 'users_file': config.admins},
                   welcome_msg='Выберите доступное действие, пожалуйста')
 
 # ----------------------------------------------------------------------------
 
-# TODO: don't know how to be with bot..
 
-quiz = Quiz(config.quiz_name, quiz_json_path=config.quiz_path)
+quiz = Quiz(config.quiz_name, quiz_json_path=config.quiz_path,
+            next_global_state_name='MAIN_MENU')
 
-take_quiz = State(name='TAKE_QUIZ',
-                  handler_welcome=quiz.run,
-                  triggers_out={'TAKE_QUIZ': {'phrases': [], 'content_type': 'text'}})
+
+class QuizState(State):
+
+    def make_reply_markup(self):
+        pass
+
+    def welcome_handler(self, bot, message, sqldb: SQLighter):
+        quiz.run(bot, message, sqldb)
+
+    def out_handler(self, bot, message, sqldb: SQLighter):
+        if message.content_type != 'text':
+            return None
+        new_state = quiz.run(bot, message, sqldb)
+        return new_state
+
+
+take_quiz = QuizState(name='TAKE_QUIZ')
+
+# ----------------------------------------------------------------------------
+
+
+check_quiz = State(name='CHECK_QUIZ',
+                   handler_welcome=quiz.run,
+                   triggers_out={'TAKE_QUIZ': {'phrases': [], 'content_type': 'text'},
+                                 'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
+                   welcome_msg='Welcome to {}'.format(quiz.name))
 
 # ----------------------------------------------------------------------------
 
@@ -201,7 +224,8 @@ def choose_file_and_send(bot, message, sqldb):
 
 
 check_hw_send = State(name='CHECK_HW_SEND',
-                      triggers_out={'CHECK_HW_SAVE_MARK': {'phrases': config.marks, 'content_type': 'text'}},
+                      triggers_out={'CHECK_HW_SAVE_MARK': {'phrases': config.marks,
+                                                           'content_type': 'text'}},
                       handler_welcome=choose_file_and_send,
                       row_width=3,
                       welcome_msg="Пожалуйста, оцените работу.")

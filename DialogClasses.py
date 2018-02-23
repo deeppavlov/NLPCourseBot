@@ -5,9 +5,10 @@ from collections import defaultdict
 from Sqlighter import SQLighter
 import logging
 
+
 class State:
     def __init__(self, name: str,
-                 triggers_out: Dict,
+                 triggers_out: Dict = None,
                  hidden_states: Dict = None,
                  welcome_msg: str = None,
                  row_width=1,
@@ -37,7 +38,8 @@ class State:
         is_markup_filled = False
         tmp_buttons = []
         for state_name, attrib in self.triggers_out.items():
-            hidden_flag = ((self.hidden_states is not None) and (state_name != self.hidden_states['state_name'])) \
+            hidden_flag = ((self.hidden_states is not None)
+                           and (state_name != self.hidden_states['state_name'])) \
                           or (self.hidden_states is None)
             if len(attrib['phrases']) > 0 and hidden_flag:
                 for txt in attrib['phrases']:
@@ -55,7 +57,8 @@ class State:
         else:
             res = None
         if self.welcome_msg:
-            bot.send_message(message.chat.id, self.welcome_msg, reply_markup=self.reply_markup, parse_mode='Markdown')
+            bot.send_message(message.chat.id, self.welcome_msg,
+                             reply_markup=self.reply_markup, parse_mode='Markdown')
         return res
 
     def default_out_handler(self, bot, message):
@@ -122,19 +125,6 @@ class DialogGraph:
         return {state.name: state for state in nodes}
 
     def run(self, message):
-        if isinstance(message, types.CallbackQuery):
-            chat_id = message.from_user.id
-            if chat_id not in self.usr_states:
-                self.usr_states[chat_id]['current_state'] = self.root_state
-                return
-            state_name = self.usr_states[chat_id]['current_state']
-            res = self.nodes[state_name].welcome_handler(self.bot, message, self.sqldb)
-            if res == 'end':
-                print('It seems, the quiz submitted!')
-                self.usr_states[chat_id]['current_state'] = self.root_state
-                return
-            else:
-                return
 
         if message.chat.username is None:
             self.bot.send_message(message.chat.id, universal_reply.NO_USERNAME_WARNING)
@@ -155,6 +145,4 @@ class DialogGraph:
         if new_state_name is not None:
             self.logger.debug("USR: " + message.chat.username + " NEW STATE: " + new_state_name)
             self.usr_states[message.chat.id]['current_state'] = new_state_name
-            res = self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)
-            if res == 'end':
-                self.usr_states[message.chat.id]['current_state'] = self.root_state
+            self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)

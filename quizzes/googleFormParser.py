@@ -77,13 +77,13 @@ if __name__ == "__main__":
     # # pprint(gf.get_tasks_json())
     # gf.save_json("./quiz6.json")
 
-    gf = GoogleFormParser(file_path='NLP._Quiz6.html')
-    gf.save_json("./quiz6.json")
+    gf = GoogleFormParser(file_path='NLP.Quiz2.html')
+    gf.save_json("./quiz2.json")
 
     # test loading
-    with open("./quiz6.json") as f:
-        lol = json.load(f)
-    pprint(lol)
+    # with open("./quiz6.json") as f:
+    #     lol = json.load(f)
+    # pprint(lol)
 
     # test file:
     # gf2 = GoogleFormParser(file_path="NLP._Quiz6.html")

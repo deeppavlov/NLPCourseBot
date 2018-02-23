@@ -4,6 +4,7 @@ from collections import defaultdict
 from utilities import download_picture
 import config
 import os
+import universal_reply as ureply
 from copy import deepcopy
 
 
@@ -12,6 +13,8 @@ class QuizQuestion:
         self.name = name
         self.question_text = question_dict['text']
         self.true_ans = question_dict['true_ans']
+        print("TRUE ANS: ", self.true_ans)
+        print(type(self.true_ans))
 
         self.grids = question_dict['grids']
         self.variants_one = question_dict['variants'] if len(question_dict['variants']) > 0 else None
@@ -19,7 +22,7 @@ class QuizQuestion:
             question_dict['several_poss_vars']) > 0 else None
         self.ask_written = False if (self.variants_one or self.variants_multiple or self.grids) else True
 
-        assert self.ask_written or (self.true_ans is not None),\
+        assert self.ask_written or (self.true_ans is not None), \
             "true_ans must be specified if not ask_written!"
 
         self.usr_answers = dict() if self.variants_one else defaultdict(list)
@@ -43,6 +46,8 @@ class QuizQuestion:
             new_path = os.path.join(config.pics_path, './img_{}'.format(self.name))
             download_picture(self.img_path, new_path)
             self.img_path = new_path
+        else:
+            self.img_path = os.path.join('./quizzes/', self.img_path)
 
     def _edit_markdown_ans(self):
         if self.variants_multiple:
@@ -80,35 +85,31 @@ class QuizQuestion:
         if self.is_last:
             self.text += '*Attention! After submitting nothing can be changed.*'
 
-    def create_inline_kb(self, arr_text=None):
+    def create_inline_kb(self, arr_text=None, row_width=5):
+
+        keyboard = types.ReplyKeyboardMarkup(row_width=row_width, resize_keyboard=True)
         if arr_text:
-            kb = self._create_inline_kb(arr_text, [str(j) for j in range(len(arr_text))])
-        else:
-            kb = self._create_inline_kb()
-        return kb
-
-    def _create_inline_kb(self, arr_text=None, arr_callback_data=None, row_width=5):
-
-        keyboard = types.InlineKeyboardMarkup(row_width=row_width)
-        if arr_text and arr_callback_data:
             keyboard.add(
-                *[types.InlineKeyboardButton(text=n, callback_data=c) for n, c in zip(arr_text, arr_callback_data)])
+                *[types.KeyboardButton(text=n) for n in arr_text])
 
-        next_button = types.InlineKeyboardButton(text='➡️', callback_data='next')
-        back_button = types.InlineKeyboardButton(text='⬅️', callback_data='back')
+        next_button = types.KeyboardButton(text=ureply.quiz_next_button)
+        back_button = types.KeyboardButton(text=ureply.quiz_back_button)
+        main_menu = types.KeyboardButton(text=ureply.quiz_main_menu_button)
 
         if self.is_last:
-            keyboard.add(types.InlineKeyboardButton(text='Submit quiz', callback_data='submit'))
-            keyboard.add(types.InlineKeyboardButton(text='Show current answers', callback_data='show'))
+            keyboard.add(types.KeyboardButton(text=ureply.quiz_submit_button),
+                         types.KeyboardButton(text=ureply.quiz_show_ans_button))
             keyboard.add(back_button)
+            keyboard.add(main_menu)
             return keyboard
 
         if self.is_first:
             keyboard.add(next_button)
+            keyboard.add(main_menu)
             return keyboard
 
         keyboard.add(*[back_button, next_button])
-
+        keyboard.add(main_menu)
         return keyboard
 
     def tick_ans_in_kb(self, ans, chat_id, remove=False):
@@ -123,7 +124,7 @@ class QuizQuestion:
         else:
             self.usr_buttons[chat_id][int(ans)] = self.usr_buttons[chat_id][int(ans)].replace(self.tick_symbol, '')
 
-    def show_asking(self, bot, chat_id, message_id=None, edit=False):
+    def show_asking(self, bot, chat_id):
         """
         Send self.text + ans variants to chat with id = msg.chat.id
         :param bot:
@@ -133,24 +134,20 @@ class QuizQuestion:
         if chat_id not in self.usr_answers:
             # add new user to dict with buttons...
             _ = self.usr_buttons[chat_id]  # ...just by adding element to defaultdict
-            if self.ask_written:
-                self.usr_answers[chat_id] = ''
+            self.usr_answers[chat_id] = None
+            if self.variants_multiple:
+                self.usr_answers[chat_id] = []
 
-            elif self.variants_one or self.grids:
-                self.usr_answers[chat_id] = None
-
-        if not edit:
-            bot.send_message(chat_id, self.text,
-                             reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
-                             parse_mode=self.parse_mode)
+        if self.ask_written and self.usr_answers[chat_id]:
+            bot.send_message(chat_id, self.text+'-'*20+'\nYOUR CURRENT ANSWER:\n'+self.usr_answers[chat_id],
+                         reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
+                         parse_mode=self.parse_mode)
         else:
-            bot.edit_message_text(
-                chat_id=chat_id,
-                message_id=message_id,
-                text=self.text,
-                reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
-                parse_mode=self.parse_mode)
-        if (self.img_path) and (not self.img_sent_dict[chat_id]):
+            bot.send_message(chat_id, self.text,
+                         reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
+                         parse_mode=self.parse_mode)
+
+        if self.img_path:
             bot.send_message(chat_id=chat_id,
                              text='Picture for the _{}_'.format(self.name),
                              parse_mode=self.parse_mode)
@@ -166,34 +163,30 @@ class QuizQuestion:
         :param msg:
         :return:
         """
-        if self.grids:
-            add = str(self.grids[int(self.usr_answers[chat_id])]) if self.usr_answers[chat_id] else 'None'
-            answers = self.text + '\n' + '🍭 Your answer: ' + add
-        else:
-            answers = self.text + '\n' + '🍭 Your answer: ' + str(self.usr_answers[chat_id])
-
+        add = str(self.usr_answers[chat_id]) if self.usr_answers[chat_id] else 'None'
+        answers = self.text + '\n' + '🍭 Your answer: ' + add
         bot.send_message(chat_id, answers, parse_mode=self.parse_mode)
 
-    def callback_handler(self, bot, c):
+    def callback_handler(self, bot, message):
         """
         Handle callbacks data from all users
         and update self.usr_dict
         :return:
         """
-        ans = c.data
-        edit = False
+        ans = message.text.replace(self.tick_symbol, '')
+        chat_id = message.chat.id
 
-        chat_id = c.from_user.id
         if self.variants_one or self.grids:
+            if self.grids:
+                ans = str(self.default_buttons.index(ans))
             if self.usr_answers[chat_id] != ans:
-                edit = True
                 if self.usr_answers[chat_id] is not None:
                     self.tick_ans_in_kb(self.usr_answers[chat_id], chat_id, remove=True)
+
                 self.tick_ans_in_kb(ans, chat_id, remove=False)
                 self.usr_answers[chat_id] = ans
 
         elif self.variants_multiple:
-            edit = True
             if ans in self.usr_answers[chat_id]:
                 self.usr_answers[chat_id].remove(ans)
                 self.tick_ans_in_kb(ans, chat_id, remove=True)
@@ -201,11 +194,8 @@ class QuizQuestion:
                 self.usr_answers[chat_id].append(ans)
                 self.tick_ans_in_kb(ans, chat_id, remove=False)
 
-        if edit:
-            keyboard = self.create_inline_kb(self.usr_buttons[chat_id])
-            bot.edit_message_reply_markup(chat_id=chat_id,
-                                          message_id=c.message.message_id,
-                                          reply_markup=keyboard)
+        keyboard = self.create_inline_kb(self.usr_buttons[chat_id])
+        bot.send_message(chat_id=chat_id, text='Your answer has been saved', reply_markup=keyboard)
 
     def save_written_answer(self, text, chat_id):
         self.usr_answers[chat_id] = text
@@ -215,6 +205,9 @@ class QuizQuestion:
         Return data for chat_id
         :return: question_name, is_right, usr_ans, question_text, true_ans
         """
+        if chat_id not in self.usr_answers:
+            return self.name, None, None, self.text, str(self.true_ans)
+
         ans = self.usr_answers[chat_id]
         is_right = None
         if self.ask_written:
@@ -224,21 +217,24 @@ class QuizQuestion:
             is_right = frozenset([int(a) for a in self.true_ans]) == frozenset([int(a) for a in ans]) if ans else False
         else:
             is_right = int(self.true_ans) == int(ans) if ans else False
-        ans = str(ans) if ans else ans
-        return self.name, int(is_right), ans, self.text, self.true_ans
+        ans = str(ans) if ans else None
+        return self.name, int(is_right), ans, self.text, str(self.true_ans)
+
 
 class Quiz:
-    def __init__(self, name, quiz_json_path):
+    def __init__(self, name, quiz_json_path, next_global_state_name, self_state_name=None):
         with open(quiz_json_path) as q:
             self.json_array = json.load(q)[1:]
         self.name = name
+        self.next_global_state_name = next_global_state_name
+        self.self_state_name = self_state_name
         self.q_num = len(self.json_array)
         self.questions = [
             QuizQuestion(name="Question {}".format(i), question_dict=d, first=(i == 0), last=(i == self.q_num - 1))
             for i, d in enumerate(self.json_array)]
-        self.callbacks_setted = False
         self.usersteps = dict()
         self.usr_submitted = defaultdict(bool)
+        self.paused = defaultdict(bool)
 
     def get_usr_step(self, chat_id):
         if chat_id not in self.usersteps:
@@ -248,33 +244,6 @@ class Quiz:
 
     def set_usr_step(self, chat_id, num: int):
         self.usersteps[chat_id] = num
-
-    def callback_query_handler(self, c, bot):
-        """
-        Handle all callbacks only
-        :param c:
-        :return:
-        """
-        chat_id = c.from_user.id
-        usr_step = self.get_usr_step(chat_id)
-        message_id = c.message.message_id
-
-        if c.data == 'next':
-            self.set_usr_step(chat_id, usr_step + 1)
-            self.questions[usr_step + 1].show_asking(bot, chat_id, message_id=message_id, edit=True)
-
-        elif c.data == 'back':
-            self.set_usr_step(chat_id, usr_step - 1)
-            self.questions[usr_step - 1].show_asking(bot, chat_id, message_id=message_id, edit=True)
-
-        elif c.data == 'submit':
-            return 'submit'
-        elif c.data == 'show':
-            for q in self.questions:
-                q.show_current(bot, chat_id)
-        else:
-            self.questions[usr_step].callback_handler(bot, c)
-        return 'done'
 
     def collect_to_db(self, user_id, chat_id, sqlighter):
         """
@@ -297,45 +266,61 @@ class Quiz:
         :param message: 
         :return: 'end' or 'continue'
         """
+
         if config.quiz_closed:
-            if(isinstance(message, types.CallbackQuery)):
-                bot.edit_message_text(chat_id=message.from_user.id,
-                                      message_id=message.message.message_id,
-                                      text='🎈 Finished! 🎉')
-                bot.send_message(chat_id=message.from_user.id, text='Квиз закрыт для сдачи.')
-            else:
-                bot.reply_to(message, "Квиз закрыт для сдачи. 🌝\n"
-                                  "Приходите позже на следующий квиз.")
-            return 'end'
-        if isinstance(message, types.CallbackQuery):
-            response = self.callback_query_handler(message, bot)
-            if response == 'submit':
-                self.collect_to_db(user_id=message.from_user.username,
-                                   chat_id=message.from_user.id, sqlighter=sqlighter)
+            bot.send_message(chat_id=message.from_user.id, text='Квиз закрыт для сдачи.')
+            return self.next_global_state_name
+
+        chat_id = message.chat.id
+
+        if self.usr_submitted[chat_id]:
+            bot.send_message(chat_id=chat_id,
+                             text="Sorry, you have already submitted {} ~_~\"".format(self.name))
+            return self.next_global_state_name
+
+        if (message.text == ureply.quiz_enter) and self.paused[chat_id]:
+            self.questions[self.usersteps[chat_id]].show_asking(bot, chat_id)
+            return self.self_state_name
+
+        if chat_id not in self.usersteps:
+            usr_step = self.get_usr_step(chat_id)
+            self.questions[usr_step].show_asking(bot, chat_id)
+            return self.self_state_name
+        else:
+            usr_step = self.get_usr_step(chat_id)
+            if message.text == ureply.quiz_main_menu_button:
+                self.paused[chat_id] = True
+                self.collect_to_db(user_id=message.chat.username,
+                                   chat_id=message.chat.id,
+                                   sqlighter=sqlighter)
+                bot.send_message(text="You current state has been saved.",
+                                 chat_id=chat_id)
+                return self.next_global_state_name
+
+            elif message.text == ureply.quiz_next_button:
+                self.set_usr_step(chat_id, usr_step + 1)
+                self.questions[usr_step + 1].show_asking(bot, chat_id)
+
+            elif message.text == ureply.quiz_back_button:
+                self.set_usr_step(chat_id, usr_step - 1)
+                self.questions[usr_step - 1].show_asking(bot, chat_id)
+
+            elif message.text == ureply.quiz_submit_button:
+                self.collect_to_db(user_id=message.chat.username,
+                                   chat_id=message.chat.id,
+                                   sqlighter=sqlighter)
                 self.usr_submitted[message.from_user.id] = True
-                bot.edit_message_text(chat_id=message.from_user.id,
-                                      message_id=message.message.message_id,
-                                      text='🎈 Finished! 🎉')
                 bot.send_message(chat_id=message.from_user.id,
                                  text='💫 Thank you! The quiz was successfully submitted! 🌝')
-                return 'end'
-            else:
-                return 'continue'
-        else:
-            chat_id = message.chat.id
-            if self.usr_submitted[chat_id]:
-                bot.send_message(chat_id=chat_id,
-                                 text="Sorry, you have already submitted {} ~_~\"".format(self.name))
-                return 'end'
-            if chat_id not in self.usersteps:
-                bot.send_message(chat_id=chat_id,
-                                 text="Welcome to *{}*".format(self.name),
-                                 parse_mode="Markdown")
-                usr_step = self.get_usr_step(chat_id)
-                self.questions[usr_step].show_asking(bot, chat_id, edit=False)
-            else:
-                usr_step = self.get_usr_step(chat_id)
-                if self.questions[usr_step].ask_written:
-                    self.questions[usr_step].save_written_answer(message.text, chat_id)
-                    bot.send_message(chat_id=chat_id, text='Your answer has been saved! ✨')
-        return 'continue'
+                return self.next_global_state_name
+
+            elif message.text == ureply.quiz_show_ans_button:
+                for q in self.questions:
+                    q.show_current(bot, chat_id)
+
+            elif self.questions[usr_step].ask_written:
+                self.questions[usr_step].save_written_answer(message.text, chat_id)
+                bot.send_message(chat_id=chat_id, text='Your answer has been saved! ✨')
+            elif message.text.replace(self.questions[0].tick_symbol, '') in self.questions[usr_step].default_buttons:
+                self.questions[usr_step].callback_handler(bot, message)
+            return self.self_state_name

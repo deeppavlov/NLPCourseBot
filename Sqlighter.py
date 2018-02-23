@@ -121,8 +121,10 @@ class SQLighter:
 
     def write_quiz_ans(self, user_id: str,
                        quiz_name: str, question_name: str,
-                       is_right: bool, usr_ans: str,
+                       is_right: int, usr_ans: str,
                        question_text: str, true_ans: str):
+
+        # TODO: check if username + quiz_num exists, then update existed
         return self.cursor.execute("INSERT INTO quizzes (user_id, quiz_name,"
                                    " question_name, is_right, usr_answer,"
                                    " question_text, true_ans, date_added) "
@@ -136,7 +138,7 @@ class SQLighter:
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    results = sql.get_checks_for_every_work()
-    df = pd.DataFrame(data=results, index=range(len(results)), columns=["hw_num", "usr", "file_id", "checks", "mark"])
-    df.to_csv("HW_STAT.csv")
-    print(df)
+    # results = sql.get_checks_for_every_work()
+    # df = pd.DataFrame(data=results, index=range(len(results)), columns=["hw_num", "usr", "file_id", "checks", "mark"])
+    # df.to_csv("HW_STAT.csv")
+    # print(df)

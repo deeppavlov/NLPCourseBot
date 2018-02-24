@@ -12,12 +12,13 @@ wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
 main_menu = State(name='MAIN_MENU',
                   row_width=2,
                   triggers_out={'PASS_HW_NUM_SELECT': {'phrases': ['🐟 Сдать дз 🐠'], 'content_type': 'text'},
-                                'ASK_QUESTION_START': {'phrases': ['🦉 Задать вопрос к семинару 🦉'],
-                                                       'content_type': 'text'},
-                                'GET_MARK': {'phrases': ['🐝 Узнать оценки за дз 🐝'], 'content_type': 'text'},
+                                'ASK_QUESTION_START': {'phrases': ['🦉 Задать вопрос 🦉'], 'content_type': 'text'},
+                                'GET_MARK': {'phrases': ['🐝 Ваши оценки за дз 🐝'], 'content_type': 'text'},
+                                'GET_QUIZ_MARK': {'phrases': ['🐝 Ваши оценки за квизы 🐝'], 'content_type': 'text'},
                                 'CHECK_HW_NUM_SELECT': {'phrases': ['🐌 Проверить дз 🐌'], 'content_type': 'text'},
                                 'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'},
-                                'TAKE_QUIZ': {'phrases': [universal_reply.quiz_enter], 'content_type': 'text'}},
+                                'TAKE_QUIZ': {'phrases': [universal_reply.quiz_enter], 'content_type': 'text'},
+                                'CHECK_QUIZ': {'phrases': [universal_reply.quiz_check], 'content_type': 'text'}},
                   hidden_states={'state_name': 'ADMIN_MENU', 'users_file': config.admins},
                   welcome_msg='Выберите доступное действие, пожалуйста')
 
@@ -26,7 +27,6 @@ main_menu = State(name='MAIN_MENU',
 
 quiz = Quiz(config.quiz_name, quiz_json_path=config.quiz_path,
             next_global_state_name='MAIN_MENU')
-
 
 class QuizState(State):
 
@@ -47,12 +47,58 @@ take_quiz = QuizState(name='TAKE_QUIZ')
 
 # ----------------------------------------------------------------------------
 
-
 check_quiz = State(name='CHECK_QUIZ',
-                   handler_welcome=quiz.run,
-                   triggers_out={'TAKE_QUIZ': {'phrases': [], 'content_type': 'text'},
-                                 'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
-                   welcome_msg='Welcome to {}'.format(quiz.name))
+                   triggers_out={
+                       'SEND_QQUESTION_TO_CHECK': {'phrases': config.quizzes_possible_to_check, 'content_type': 'text'},
+                       'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
+                   welcome_msg='Пожалуйста, выберите номер квиза для проверки:')
+
+
+# ----------------------------------------------------------------------------
+
+def send_qquestion(bot, message, sqldb):
+    if message.text not in config.quizzes_possible_to_check:
+        quiz_name = sqldb.get_latest_quiz_name(message.chat.username)
+    else:
+        quiz_name = message.text
+    if quiz_name is None:
+        bot.send_message("SMTH WENT WRONG..")
+        return
+    arr = sqldb.get_quiz_question_to_check(quiz_name=quiz_name,
+                                           user_id=message.chat.username)
+    if len(arr) > 0:
+        q_id, q_name, q_text, q_user_ans, _ = arr
+        sqldb.make_fake_db_record_quiz(q_id, message.chat.username)
+        bot.send_message(chat_id=message.chat.id, text=q_text + '\n' + 'USER_ANSWER:\n' + q_user_ans)
+    else:
+        # TODO: do smth with empty db;
+        bot.send_message(text='К сожалению проверить пока нечего.',
+                         chat_id=message.chat.id)
+
+
+send_quiz_question_to_check = State(name='SEND_QQUESTION_TO_CHECK',
+                                    row_width=3,
+                                    triggers_out={'SAVE_MARK': {'phrases': ['Верю', 'Не верю']},
+                                                  'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
+                                    handler_welcome=send_qquestion,
+                                    welcome_msg='Правильно или нет ответил пользователь?\n'
+                                                'Нажмите кнопку, чтобы оценить ответ.')
+
+
+# ----------------------------------------------------------------------------
+
+def save_mark_quiz(bot, message, sqldb):
+    is_right = int(message.text == 'Верю')
+    sqldb.save_mark_quiz(message.chat.username, is_right)
+    bot.send_message(text='Оценка сохранена. Спасибо.', chat_id=message.chat.id)
+
+
+save_mark_quiz = State(name='SAVE_MARK',
+                       row_width=2,
+                       triggers_out={'SEND_QQUESTION_TO_CHECK': {'phrases': ['Продолжить проверку']},
+                                     'CHECK_QUIZ': {'phrases': ['Назад']}},
+                       handler_welcome=save_mark_quiz,
+                       welcome_msg='Желаете ли еще проверить ответы из того же квиза?')
 
 # ----------------------------------------------------------------------------
 
@@ -194,6 +240,18 @@ get_mark = State(name='GET_MARK',
                  triggers_out={'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
                  handler_welcome=show_marks_table,
                  welcome_msg='Такие дела)')
+
+
+# ----------------------------------------------------------------------------
+def get_marks_table_quiz(bot, message, sqldb):
+    bot.send_message(text="Пока никто не проверил ваши квизы. Возвращайтесь позже.",
+                     chat_id=message.chat.id)
+    # table = sqldb.get_marks_quiz(user_id=message.chat.username)
+
+get_quiz_mark = State(name='GET_QUIZ_MARK',
+                      triggers_out={'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
+                      handler_welcome=get_marks_table_quiz,
+                      welcome_msg='Такие дела..')
 
 # ----------------------------------------------------------------------------
 

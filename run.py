@@ -48,6 +48,10 @@ bot = telebot.TeleBot(config.token, threaded=False)
 nodes = [DialogStatesDefinition.main_menu,
 
          DialogStatesDefinition.take_quiz,
+         DialogStatesDefinition.check_quiz,
+         DialogStatesDefinition.get_quiz_mark,
+         DialogStatesDefinition.save_mark_quiz,
+         DialogStatesDefinition.send_quiz_question_to_check,
 
          DialogStatesDefinition.ask_question_start,
          DialogStatesDefinition.save_question,

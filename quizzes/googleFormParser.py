@@ -17,7 +17,7 @@ class GoogleFormParser:
             5. 'img' -- image path on file sys or url
     """
 
-    def __init__(self, url: object = None, file_path: object = None) -> object:
+    def __init__(self, url: str = None, file_path: str = None):
 
         assert (url is not None) ^ (file_path is not None), "Only one of 2 arguments must be specified!"
 

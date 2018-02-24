@@ -24,7 +24,8 @@ class SQLighter:
             self.cursor.execute("CREATE TABLE hw_checking ( file_id TEXT, user_id TEXT, mark INTEGER, "
                                 "date_checked INTEGER, date_started INTEGER );")
 
-            self.cursor.execute("CREATE TABLE quizzes ( user_id	TEXT, "
+            self.cursor.execute("CREATE TABLE quizzes ( "
+                                "user_id	TEXT, "
                                 "question_name	TEXT, "
                                 "quiz_name	TEXT, "
                                 "question_text TEXT, "
@@ -33,7 +34,8 @@ class SQLighter:
                                 "usr_answer	TEXT, "
                                 "date_added INTEGER, "
                                 "id INTEGER PRIMARY KEY AUTOINCREMENT );")
-            self.cursor.execute("CREATE TABLE quizzes_checking ( checker_user_id TEXT, "
+            self.cursor.execute("CREATE TABLE quizzes_checking ( "
+                                "checker_user_id TEXT, "
                                 "id_quizzes INTEGER, "
                                 "date_started INTEGER, "
                                 "date_checked INTEGER, "
@@ -61,6 +63,11 @@ class SQLighter:
         self.cursor.execute("INSERT INTO hw (user_id, hw_num, date_added)"
                             " VALUES (?, ?, strftime('%s','now'))", (user_id, hw_number))
 
+    def make_fake_db_record_quiz(self, q_id, user_id):
+        """ Make empty record for this quiz_name & user_id"""
+        self.cursor.execute("INSERT INTO quizzes_checking (checker_user_id, id_quizzes, date_started)"
+                            " VALUES (?, ?, strftime('%s','now'))", (user_id, q_id))
+
     def upd_homework(self, user_id, file_id):
         """ UPD the latest record of user_id with file_id """
         self.cursor.execute("UPDATE hw SET file_id = ?, date_added = strftime('%s','now') "
@@ -85,11 +92,45 @@ class SQLighter:
                                     'num_files': number_of_files,
                                     'usr_id': user_id}).fetchall()
 
+    def get_latest_quiz_name(self, user_id):
+        result = self.cursor.execute("SELECT quizzes.quiz_name "
+                                     "FROM quizzes LEFT OUTER JOIN quizzes_checking "
+                                     "ON quizzes.id = quizzes_checking.id_quizzes "
+                                     "WHERE quizzes_checking.checker_user_id = ? "
+                                     "AND quizzes_checking.is_right IS NOT NULL "
+                                     "GROUP BY quizzes.quiz_name "
+                                     "ORDER BY quizzes_checking.date_checked DESC LIMIT 1", (user_id,)).fetchall()
+        if len(result) > 0:
+            return result[0][0]
+
+    def get_quiz_question_to_check(self, quiz_name, user_id):
+        array = self.cursor.execute(
+            "SELECT quizzes.id, quizzes.question_name, quizzes.question_text, quizzes.usr_answer, "
+            "count(quizzes_checking.id_quizzes) checks "
+            "FROM quizzes LEFT OUTER JOIN quizzes_checking "
+            "ON quizzes.id = quizzes_checking.id_quizzes "
+            "WHERE quizzes.user_id != ? "
+            "AND quizzes.quiz_name = ? "
+            "AND quizzes.usr_answer IS NOT NULL "
+            "AND quizzes.true_ans IS NULL "
+            # "AND quizzes_checking.checker_user_id != ?"
+            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1", (user_id, quiz_name, user_id)).fetchall()
+        if len(array) > 0:
+            return array[0]
+        return array
+
     def save_mark(self, user_id, mark):
         return self.cursor.execute("UPDATE hw_checking SET mark = ?, date_checked=strftime('%s','now') "
                                    "WHERE user_id = ? AND file_id = "
                                    "(SELECT file_id FROM hw_checking "
                                    "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
+
+    def save_mark_quiz(self, user_id, mark):
+        return self.cursor.execute("UPDATE quizzes_checking SET is_right = ?, date_checked=strftime('%s','now') "
+                                   "WHERE checker_user_id = ? AND id_quizzes = "
+                                   "(SELECT id_quizzes FROM quizzes_checking "
+                                   "WHERE checker_user_id = ? ORDER BY date_started DESC LIMIT 1)",
+                                   (mark, user_id, user_id))
 
     def get_num_checked(self, user_id):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
@@ -105,6 +146,15 @@ class SQLighter:
             "WHERE hw.user_id = ? "
             "AND hw.file_id IS NOT NULL AND hw_checking.mark IS NOT NULL "
             "GROUP BY hw.date_added, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
+
+    def get_marks_quiz(self, user_id):
+        return self.cursor.execute(
+            "SELECT quizzes.quiz_name, datetime(quizzes.date_added, 'unixepoch', 'localtime'), "
+            "avg(quizzes_checking.is_right) avg_mark "
+            "FROM quizzes LEFT JOIN quizzes_checking ON quizzes.id = quizzes_checking.id_quizzes "
+            "WHERE quizzes.user_id = ? "
+            "AND quizzes_checking.is_right IS NOT NULL "
+            "GROUP BY quizzes.quiz_name, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
 
     def get_checked_works_stat(self):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
@@ -123,14 +173,23 @@ class SQLighter:
                        quiz_name: str, question_name: str,
                        is_right: int, usr_ans: str,
                        question_text: str, true_ans: str):
-
-        # TODO: check if username + quiz_num exists, then update existed
-        return self.cursor.execute("INSERT INTO quizzes (user_id, quiz_name,"
-                                   " question_name, is_right, usr_answer,"
-                                   " question_text, true_ans, date_added) "
-                                   "VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))",
-                                   (user_id, quiz_name, question_name,
-                                    is_right, usr_ans, question_text, true_ans))
+        # check existence:
+        record = self.cursor.execute("SELECT * FROM quizzes "
+                                     "WHERE quiz_name = ? AND question_name = ? AND user_id = ?",
+                                     (quiz_name, question_name, user_id)).fetchall()
+        # update if exists:
+        if len(record) > 0:
+            return self.cursor.execute("UPDATE quizzes SET is_right=?, usr_answer=?, "
+                                       "date_added=strftime('%s','now')"
+                                       " WHERE user_id=? AND quiz_name = ? AND question_name = ?",
+                                       (is_right, usr_ans, user_id, quiz_name, question_name))
+        else:
+            return self.cursor.execute("INSERT INTO quizzes (user_id, quiz_name,"
+                                       " question_name, is_right, usr_answer,"
+                                       " question_text, true_ans, date_added) "
+                                       "VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))",
+                                       (user_id, quiz_name, question_name,
+                                        is_right, usr_ans, question_text, true_ans))
 
     def close(self):
         self.connection.close()
@@ -138,6 +197,9 @@ class SQLighter:
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
+    # res = sql.get_quiz_question_to_check('quiz 2', 'fogside')
+    res = sql.get_latest_quiz_name('fogside')
+    print(res)
     # results = sql.get_checks_for_every_work()
     # df = pd.DataFrame(data=results, index=range(len(results)), columns=["hw_num", "usr", "file_id", "checks", "mark"])
     # df.to_csv("HW_STAT.csv")

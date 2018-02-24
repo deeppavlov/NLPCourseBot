@@ -5,9 +5,10 @@ token = os.environ['TOKEN']
 
 hw_possible_to_pass = []
 hw_possible_to_check = []
+quizzes_possible_to_check = ['quiz 1']
 admins = ['fogside', 'madrugado']
-quiz_name = 'quiz 6'
-quiz_path = './quizzes/quiz1.json'
+quiz_name = 'quiz 2'
+quiz_path = './quizzes/quiz2.json'
 quiz_closed = False
 pics_path = './quizzes/pics'
 

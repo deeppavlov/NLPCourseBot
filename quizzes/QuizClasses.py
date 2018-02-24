@@ -139,13 +139,14 @@ class QuizQuestion:
                 self.usr_answers[chat_id] = []
 
         if self.ask_written and self.usr_answers[chat_id]:
-            bot.send_message(chat_id, self.text+'-'*20+'\nYOUR CURRENT ANSWER:\n'+self.usr_answers[chat_id],
-                         reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
-                         parse_mode=self.parse_mode)
+            bot.send_message(chat_id,
+                             self.text + '\n' + '-' * 20 + '\nYOUR CURRENT ANSWER:\n' + self.usr_answers[chat_id],
+                             reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
+                             parse_mode=self.parse_mode)
         else:
             bot.send_message(chat_id, self.text,
-                         reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
-                         parse_mode=self.parse_mode)
+                             reply_markup=self.create_inline_kb(self.usr_buttons[chat_id]),
+                             parse_mode=self.parse_mode)
 
         if self.img_path:
             bot.send_message(chat_id=chat_id,
@@ -223,14 +224,19 @@ class QuizQuestion:
 
 class Quiz:
     def __init__(self, name, quiz_json_path, next_global_state_name, self_state_name=None):
-        with open(quiz_json_path) as q:
-            self.json_array = json.load(q)[1:]
+        self.reinitialize(quiz_json_path)
         self.name = name
         self.next_global_state_name = next_global_state_name
         self.self_state_name = self_state_name
+
+    def reinitialize(self, new_quiz_json_path):
+        with open(new_quiz_json_path) as q:
+            self.json_array = json.load(q)[1:]
         self.q_num = len(self.json_array)
         self.questions = [
-            QuizQuestion(name="Question {}".format(i), question_dict=d, first=(i == 0), last=(i == self.q_num - 1))
+            QuizQuestion(name="Question {}".format(i),
+                         question_dict=d, first=(i == 0),
+                         last=(i == self.q_num - 1))
             for i, d in enumerate(self.json_array)]
         self.usersteps = dict()
         self.usr_submitted = defaultdict(bool)

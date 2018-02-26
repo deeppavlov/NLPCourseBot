@@ -289,6 +289,9 @@ class Quiz:
 
         if chat_id not in self.usersteps:
             usr_step = self.get_usr_step(chat_id)
+            bot.send_message(text='🌜 Welcome to *'+self.name+'* 🌛',
+                             chat_id=message.chat.id,
+                             parse_mode='Markdown')
             self.questions[usr_step].show_asking(bot, chat_id)
             return self.self_state_name
         else:

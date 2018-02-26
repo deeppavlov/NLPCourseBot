@@ -3,7 +3,9 @@ from Sqlighter import SQLighter
 import universal_reply
 import config
 import random
+import pandas as pd
 from quizzes.QuizClasses import Quiz
+from tabulate import tabulate
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
                              triggers_out={'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}})
@@ -27,6 +29,7 @@ main_menu = State(name='MAIN_MENU',
 
 quiz = Quiz(config.quiz_name, quiz_json_path=config.quiz_path,
             next_global_state_name='MAIN_MENU')
+
 
 class QuizState(State):
 
@@ -57,6 +60,8 @@ check_quiz = State(name='CHECK_QUIZ',
 # ----------------------------------------------------------------------------
 
 def send_qquestion(bot, message, sqldb):
+    num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
+
     if message.text not in config.quizzes_possible_to_check:
         quiz_name = sqldb.get_latest_quiz_name(message.chat.username)
     else:
@@ -69,7 +74,10 @@ def send_qquestion(bot, message, sqldb):
     if len(arr) > 0:
         q_id, q_name, q_text, q_user_ans, _ = arr
         sqldb.make_fake_db_record_quiz(q_id, message.chat.username)
-        bot.send_message(chat_id=message.chat.id, text=q_text + '\n' + 'USER_ANSWER:\n' + q_user_ans)
+        text = 'You have checked: {}/{}\n'.format(num_checked, config.quizzes_need_to_check) \
+               + q_text + '\n' + 'USER_ANSWER:\n' + q_user_ans
+        bot.send_message(chat_id=message.chat.id,
+                         text=text,)
     else:
         # TODO: do smth with empty db;
         bot.send_message(text='К сожалению проверить пока нечего.',
@@ -81,13 +89,13 @@ send_quiz_question_to_check = State(name='SEND_QQUESTION_TO_CHECK',
                                     triggers_out={'SAVE_MARK': {'phrases': ['Верю', 'Не верю']},
                                                   'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
                                     handler_welcome=send_qquestion,
-                                    welcome_msg='Правильно или нет ответил пользователь?\n'
+                                    welcome_msg='🌻 Правильно или нет ответил пользователь?\n'
                                                 'Нажмите кнопку, чтобы оценить ответ.')
 
 
 # ----------------------------------------------------------------------------
 
-def save_mark_quiz(bot, message, sqldb):
+def mark_saving_quiz(bot, message, sqldb):
     is_right = int(message.text == 'Верю')
     sqldb.save_mark_quiz(message.chat.username, is_right)
     bot.send_message(text='Оценка сохранена. Спасибо.', chat_id=message.chat.id)
@@ -97,8 +105,8 @@ save_mark_quiz = State(name='SAVE_MARK',
                        row_width=2,
                        triggers_out={'SEND_QQUESTION_TO_CHECK': {'phrases': ['Продолжить проверку']},
                                      'CHECK_QUIZ': {'phrases': ['Назад']}},
-                       handler_welcome=save_mark_quiz,
-                       welcome_msg='Желаете ли еще проверить ответы из того же квиза?')
+                       handler_welcome=mark_saving_quiz,
+                       welcome_msg='🌻 Желаете ли еще проверить ответы из того же квиза?')
 
 # ----------------------------------------------------------------------------
 
@@ -244,14 +252,42 @@ get_mark = State(name='GET_MARK',
 
 # ----------------------------------------------------------------------------
 def get_marks_table_quiz(bot, message, sqldb):
-    bot.send_message(text="Пока никто не проверил ваши квизы. Возвращайтесь позже.",
-                     chat_id=message.chat.id)
-    # table = sqldb.get_marks_quiz(user_id=message.chat.username)
+    num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
+    if num_checked < config.quizzes_need_to_check:
+        bot.send_message(chat_id=message.chat.id,
+                         text='🌳🌻 Вы проверили {} квизов. '
+                              'Необходимо проверить еще {} квизов,'
+                              ' чтобы узнать свою оценку.'.format(num_checked,
+                                                                  config.quizzes_need_to_check - num_checked))
+        return
+    table = sqldb.get_marks_quiz(user_id=message.chat.username)
+    if table.empty:
+        bot.send_message(chat_id=message.chat.id,
+                         text="Пока никто не проверил ваши квизы или вы их вообще не сдавали.\n"
+                              "Возвращайтесь позже.🌳🌻 ")
+        return
+    finals = defaultdict(list)
+    for quiz, df in table.groupby('Quiz'):
+        if len(df) < 5:
+            continue
+        for i, row in df.iterrows():
+            text = '*' + quiz + '*\n' + '=' * 20 + '\n'
+            text += row.QuestionText + '\n' + '=' * 20 + '\n' + '*Your Answer: *\n' \
+                    + str(row.YourAnswer) + '\n*Score: *' + str(row.Score)
+            if not pd.isna(row.NumChecks):
+                text += '\n*Checked for [{}] times*'.format(row.NumChecks)
+            bot.send_message(text=text, chat_id=message.chat.id, parse_mode='Markdown')
+        mark = '{}/{}'.format(int(sum(df.Score)), len(df))
+        finals['quiz'].append(quiz)
+        finals['mark'].append(mark)
+    bot.send_message(text='<code>' + tabulate(finals, headers='keys', tablefmt="fancy_grid") + '</code>',
+                     chat_id=message.chat.id, parse_mode='html')
+
 
 get_quiz_mark = State(name='GET_QUIZ_MARK',
                       triggers_out={'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}},
                       handler_welcome=get_marks_table_quiz,
-                      welcome_msg='Такие дела..')
+                      welcome_msg='Good Luck:)')
 
 # ----------------------------------------------------------------------------
 
@@ -306,11 +342,43 @@ check_hw_save_mark = State(name='CHECK_HW_SAVE_MARK',
 # ----------------------------------------------------------------------------
 
 admin_menu = State(name='ADMIN_MENU',
+                   row_width=3,
                    triggers_out={
-                       'KNOW_NEW_QUESTIONS': {'phrases': ['Узнать вопросы к семинару'], 'content_type': 'text'},
-                       'SEE_HW_STAT': {'phrases': ['Узнать статистику сдачи домашек'], 'content_type': 'text'},
-                       'MAIN_MENU': {'phrases': ['Главное меню'], 'content_type': 'text'}},
+                       'KNOW_NEW_QUESTIONS': {'phrases': ['Questions'], 'content_type': 'text'},
+                       'SEE_HW_STAT': {'phrases': ['Homeworks'], 'content_type': 'text'},
+                       'MAIN_MENU': {'phrases': ['MainMenu'], 'content_type': 'text'},
+                       'SEE_QUIZZES_STAT': {'phrases': ['Quizzes'], 'content_type': 'text'},
+                       'CHANGE_HW_AVAILABLE_TO_PASS': {'phrases': ['ChangeHWToPass'], 'content_type': 'text'},
+                       'CHANGE_QUIZ_PATH': {'phrases': ['ChangeQuizPath'], 'content_type': 'text'},
+                       'CHANGE_QUIZ_AVAILABLE': {'phrases': ['TurnOffQuiz'], 'content_type': 'text'}
+                   },
                    welcome_msg='Добро пожаловать, о Великий Одмен!')
+
+# ----------------------------------------------------------------------------
+
+change_hw_available_to_pass = State(name='CHANGE_HW_AVAILABLE_TO_PASS',
+                                    triggers_out={'ADMIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'},
+                                                  'REPLACE_CURRENT_AVAILABLE_HW': {'phrases': [],
+                                                                                   'content_type': 'text'}},
+                                    welcome_msg='Введите команду руководствуясь следующим принципом:\n'
+                                                '1. Одно сообщение -- одна команда. Без перевода строк. Без кавычек.'
+                                                ' Без решеток, они тут для красоты.\n'
+                                                '2. Пример команд:\n'
+                                                '# `REMOVE Hw3` -- удаляет из доступных для сдачи заданий Hw3\n'
+                                                '# `ADD Hw2` -- делает доступной сдачу задания Hw2\n'
+                                                '# `REMOVE ALL` -- делает сдачу заданий недоступным.\n')
+
+
+# ----------------------------------------------------------------------------
+def change_current_available_hw(bot, message, sqldb):
+    pass
+
+replace_current_available_hw = State(name='REPLACE_CURRENT_AVAILABLE_HW',
+                                     triggers_out={'ADMIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'},
+                                                   'REPLACE_CURRENT_AVAILABLE_HW': {'phrases': [],
+                                                                                    'content_type': 'text'}},
+                                     welcome_msg='Команда выполнена(или нет). '
+                                                 'Любое следующее сообщение кроме `Назад` будет воспринято как команда.')
 
 
 # ----------------------------------------------------------------------------

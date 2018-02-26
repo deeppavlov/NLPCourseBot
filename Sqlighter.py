@@ -33,6 +33,7 @@ class SQLighter:
                                 "is_right	INTEGER, "
                                 "usr_answer	TEXT, "
                                 "date_added INTEGER, "
+                                "submitted INTEGER, "
                                 "id INTEGER PRIMARY KEY AUTOINCREMENT );")
             self.cursor.execute("CREATE TABLE quizzes_checking ( "
                                 "checker_user_id TEXT, "
@@ -103,7 +104,16 @@ class SQLighter:
         if len(result) > 0:
             return result[0][0]
 
+    def get_number_checked_quizzes(self, user_id):
+        result = self.cursor.execute("SELECT count(quizzes_checking.id_quizzes) "
+                                     "FROM quizzes_checking WHERE checker_user_id = ? "
+                                     "AND is_right IS NOT NULL", (user_id,)).fetchall()
+        if len(result) > 0:
+            return result[0][0]
+        return 0
+
     def get_quiz_question_to_check(self, quiz_name, user_id):
+        # TODO: fix processing of '' user answers;
         array = self.cursor.execute(
             "SELECT quizzes.id, quizzes.question_name, quizzes.question_text, quizzes.usr_answer, "
             "count(quizzes_checking.id_quizzes) checks "
@@ -112,9 +122,10 @@ class SQLighter:
             "WHERE quizzes.user_id != ? "
             "AND quizzes.quiz_name = ? "
             "AND quizzes.usr_answer IS NOT NULL "
+            # "AND quizzes.usr_answer IS NOT '' "
             "AND quizzes.true_ans IS NULL "
             # "AND quizzes_checking.checker_user_id != ?"
-            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1", (user_id, quiz_name, user_id)).fetchall()
+            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1", (user_id, quiz_name,)).fetchall()
         if len(array) > 0:
             return array[0]
         return array
@@ -126,11 +137,13 @@ class SQLighter:
                                    "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
 
     def save_mark_quiz(self, user_id, mark):
-        return self.cursor.execute("UPDATE quizzes_checking SET is_right = ?, date_checked=strftime('%s','now') "
+        self.cursor.execute("UPDATE quizzes_checking SET is_right = ?, date_checked=strftime('%s','now') "
                                    "WHERE checker_user_id = ? AND id_quizzes = "
                                    "(SELECT id_quizzes FROM quizzes_checking "
                                    "WHERE checker_user_id = ? ORDER BY date_started DESC LIMIT 1)",
                                    (mark, user_id, user_id))
+        self.connection.commit()
+
 
     def get_num_checked(self, user_id):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
@@ -148,13 +161,38 @@ class SQLighter:
             "GROUP BY hw.date_added, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
 
     def get_marks_quiz(self, user_id):
-        return self.cursor.execute(
-            "SELECT quizzes.quiz_name, datetime(quizzes.date_added, 'unixepoch', 'localtime'), "
-            "avg(quizzes_checking.is_right) avg_mark "
+        automarks = self.cursor.execute(
+            "SELECT quiz_name, "
+            "question_name, "
+            "quizzes.question_text, "
+            "usr_answer, "
+            "is_right "
+            # "datetime(quizzes.date_added, 'unixepoch', 'localtime') "
+            "FROM quizzes WHERE user_id = ? AND true_ans IS NOT NULL", (user_id,)).fetchall()
+        cross_marks = self.cursor.execute(
+            "SELECT quizzes.quiz_name, "
+            "quizzes.question_name,"
+            "quizzes.question_text, "
+            "quizzes.usr_answer, "
+            "round(avg(quizzes_checking.is_right),0), "
+            "count(quizzes_checking.is_right) "
+            # " datetime(quizzes.date_added, 'unixepoch', 'localtime') "
             "FROM quizzes LEFT JOIN quizzes_checking ON quizzes.id = quizzes_checking.id_quizzes "
             "WHERE quizzes.user_id = ? "
+            "AND quizzes.true_ans IS NULL "
             "AND quizzes_checking.is_right IS NOT NULL "
-            "GROUP BY quizzes.quiz_name, hw.hw_num ORDER BY avg_mark", (user_id,)).fetchall()
+            "GROUP BY quizzes.id ORDER BY quizzes.quiz_name", (user_id,)).fetchall()
+
+        if len(cross_marks) < 1:
+            # in case of nothing checked:
+            return pd.DataFrame()
+
+        automarks.extend(cross_marks)
+        marks = pd.DataFrame(automarks, columns=['Quiz', 'Question', 'QuestionText',
+                                                 'YourAnswer', 'Score', 'NumChecks'])
+        marks.sort_values(by=['Quiz', 'Question'], inplace=True)
+        marks['Question'] = marks['Question'].apply(lambda x: x[-1:])
+        return marks
 
     def get_checked_works_stat(self):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
@@ -190,17 +228,11 @@ class SQLighter:
                                        "VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))",
                                        (user_id, quiz_name, question_name,
                                         is_right, usr_ans, question_text, true_ans))
-
     def close(self):
         self.connection.close()
 
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    # res = sql.get_quiz_question_to_check('quiz 2', 'fogside')
-    res = sql.get_latest_quiz_name('fogside')
-    print(res)
-    # results = sql.get_checks_for_every_work()
-    # df = pd.DataFrame(data=results, index=range(len(results)), columns=["hw_num", "usr", "file_id", "checks", "mark"])
-    # df.to_csv("HW_STAT.csv")
-    # print(df)
+    lol = sql.get_number_checked_quizzes('metya')
+    print(lol)

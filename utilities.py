@@ -2,6 +2,7 @@ import requests
 import os
 import config
 import telebot
+import pickle
 
 
 def download_file(bot, file_id, folder_name, filename):
@@ -17,6 +18,7 @@ def download_file(bot, file_id, folder_name, filename):
             if chunk:  # filter out keep-alive new chunks
                 f.write(chunk)
 
+
 def download_picture(pic_url, pic_path):
     with open(pic_path, 'wb') as handle:
         response = requests.get(pic_url, stream=True)
@@ -29,6 +31,18 @@ def download_picture(pic_url, pic_path):
                 break
             handle.write(block)
 
+
+def dump_current_states(graph, quiz):
+    path = config.dump_all_path
+    graph.sqldb.connection.commit()
+
+    with open(os.path.join(path, 'dump_graph.pickle'), 'wb') as fout:
+        pickle.dump({'nodes': graph.nodes,
+                     'states': graph.usr_states}, fout)
+    with open(os.path.join(path, 'dump_quiz.pickle'), 'wb') as fout:
+        pickle.dump({'usersteps': quiz.usersteps,
+                     'question': quiz.questions}, fout)
+    print("DUMPED")
 
 
 if __name__ == '__main__':

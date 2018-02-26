@@ -13,8 +13,6 @@ class QuizQuestion:
         self.name = name
         self.question_text = question_dict['text']
         self.true_ans = question_dict['true_ans']
-        print("TRUE ANS: ", self.true_ans)
-        print(type(self.true_ans))
 
         self.grids = question_dict['grids']
         self.variants_one = question_dict['variants'] if len(question_dict['variants']) > 0 else None
@@ -207,7 +205,8 @@ class QuizQuestion:
         :return: question_name, is_right, usr_ans, question_text, true_ans
         """
         if chat_id not in self.usr_answers:
-            return self.name, None, None, self.text, str(self.true_ans)
+            true = str(self.true_ans) if self.true_ans else None
+            return self.name, None, None, self.text, true
 
         ans = self.usr_answers[chat_id]
         is_right = None

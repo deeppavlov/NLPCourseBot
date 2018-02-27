@@ -30,7 +30,6 @@ class QuizQuestion:
         self.img_path = question_dict['img'] if len(question_dict['img']) > 0 else None
         if self.img_path:
             self._check_img_url()
-        self.img_sent_dict = defaultdict(bool)
 
         self.parse_mode = parse_mode
         if self.parse_mode == 'Markdown':
@@ -152,7 +151,6 @@ class QuizQuestion:
                              parse_mode=self.parse_mode)
             with open(self.img_path, 'rb') as photo:
                 # TODO: insert in DB file id to send it quicker to others
-                self.img_sent_dict[chat_id] = True
                 bot.send_photo(chat_id=chat_id, photo=photo)
 
     def show_current(self, bot, chat_id):
@@ -257,6 +255,9 @@ class Quiz:
         """
         for q in self.questions:
             question_name, is_right, usr_ans, question_text, true_ans = q.get_ans(chat_id)
+            if q.ask_written and ((usr_ans is None) or (usr_ans == '')):
+                is_right = 0
+                usr_ans = None
             sqlighter.write_quiz_ans(user_id=user_id,
                                      quiz_name=self.name,
                                      question_name=question_name,
@@ -279,8 +280,6 @@ class Quiz:
         chat_id = message.chat.id
 
         if self.usr_submitted[chat_id]:
-            bot.send_message(chat_id=chat_id,
-                             text="Sorry, you have already submitted {} ~_~\"".format(self.name))
             return self.next_global_state_name
 
         if (message.text == ureply.quiz_enter) and self.paused[chat_id]:
@@ -289,7 +288,7 @@ class Quiz:
 
         if chat_id not in self.usersteps:
             usr_step = self.get_usr_step(chat_id)
-            bot.send_message(text='🌜 Welcome to *'+self.name+'* 🌛',
+            bot.send_message(text='🌜 Welcome to *' + self.name + '* 🌛',
                              chat_id=message.chat.id,
                              parse_mode='Markdown')
             self.questions[usr_step].show_asking(bot, chat_id)

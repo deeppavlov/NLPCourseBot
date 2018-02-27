@@ -11,8 +11,12 @@ quiz_name = 'quiz 2'
 quiz_path = './quizzes/quiz2.json'
 quizzes_need_to_check = 25
 quiz_closed = False
+stat_quiz_name = 'quiz 1'
 pics_path = './quizzes/pics'
-dump_all_path = './backup/'
+dump_graph_path = './backup/graph.dump'
+dump_quiz_path = './backup/quiz.dump'
+load_graph = True
+load_states = True
 
 marks = [str(i) for i in range(1, 6)]
 available_hw_resolutions = ('zip', 'rar', '7z', 'tar', 'tar.bz2', 'tar.gz', 'tar.xz', 'ipynb')

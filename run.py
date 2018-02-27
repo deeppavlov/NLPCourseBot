@@ -59,6 +59,8 @@ nodes = [DialogStatesDefinition.main_menu,
          DialogStatesDefinition.admin_menu,
          DialogStatesDefinition.know_new_questions,
          DialogStatesDefinition.see_hw_stat,
+         DialogStatesDefinition.see_quizzes_stat,
+         DialogStatesDefinition.make_backup,
 
          DialogStatesDefinition.pass_hw_num_selection,
          DialogStatesDefinition.pass_hw_chosen_num,

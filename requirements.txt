@@ -1,2 +1,7 @@
 Flask>=0.12.2
 pyTelegramBotAPI>=3.2.1
+dill==0.2.7.1
+beautifulsoup4==4.6.0
+pandas==0.22.0
+requests==2.18.4
+tabulate==0.8.2

@@ -5,7 +5,7 @@ from collections import defaultdict
 from Sqlighter import SQLighter
 import logging
 from collections import OrderedDict
-import pickle
+import dill
 import config
 
 
@@ -147,12 +147,12 @@ class DialogGraph:
 
     def dump_current_states(self):
         with open(self.dump_path, 'wb') as fout:
-            pickle.dump({'states': self.usr_states}, fout)
+            dill.dump({'states': self.usr_states}, fout)
 
     def load_current_states(self):
         try:
             with open(self.dump_path, 'rb') as fin:
-                unpickled = pickle.load(fin)
+                unpickled = dill.load(fin)
                 self.usr_states = unpickled['usr_states']
         except FileNotFoundError:
             pass

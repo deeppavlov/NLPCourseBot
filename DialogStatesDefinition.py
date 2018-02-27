@@ -7,6 +7,7 @@ import pandas as pd
 from quizzes.QuizClasses import Quiz
 from tabulate import tabulate
 from collections import OrderedDict
+import dill
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
                              triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}}))
@@ -39,13 +40,7 @@ class QuizState(State):
 
     def dump_current_states(self):
         with open(self.dump_path, 'wb') as fout:
-            print({'usersteps': self.quiz.usersteps,
-                         'submitted': self.quiz.usr_submitted,
-                         'paused': self.quiz.paused,
-                         'usr_buttons': {q.name: q.usr_buttons for q in self.quiz.questions},
-                         'usr_answers': {q.name: q.usr_answers for q in self.quiz.questions}
-                         })
-            pickle.dump({'usersteps': self.quiz.usersteps,
+            dill.dump({'usersteps': self.quiz.usersteps,
                          'submitted': self.quiz.usr_submitted,
                          'paused': self.quiz.paused,
                          'usr_buttons': {q.name: q.usr_buttons for q in self.quiz.questions},
@@ -56,7 +51,7 @@ class QuizState(State):
     def load_current_states(self):
         try:
             with open(self.dump_path, 'rb') as fin:
-                unpickled = pickle.load(fin)
+                unpickled = dill.load(fin)
                 self.quiz.usersteps = unpickled['usersteps']
                 self.quiz.usr_submitted = unpickled['submitted']
                 self.quiz.paused = unpickled['paused']
@@ -409,7 +404,7 @@ make_backup = State(name='MAKE_BACKUP',
                     triggers_out=OrderedDict({'ADMIN_MENU': {'phrases': ['Назад в админку'],
                                                              'content_type': 'text'}}),
                     handler_welcome=make_backup_now,
-                    welcome_msg='Done')
+                    welcome_msg='Working on pickling objects...')
 
 
 # ----------------------------------------------------------------------------

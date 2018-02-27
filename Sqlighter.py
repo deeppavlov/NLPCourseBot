@@ -33,7 +33,6 @@ class SQLighter:
                                 "is_right	INTEGER, "
                                 "usr_answer	TEXT, "
                                 "date_added INTEGER, "
-                                "submitted INTEGER, "
                                 "id INTEGER PRIMARY KEY AUTOINCREMENT );")
             self.cursor.execute("CREATE TABLE quizzes_checking ( "
                                 "checker_user_id TEXT, "
@@ -138,12 +137,11 @@ class SQLighter:
 
     def save_mark_quiz(self, user_id, mark):
         self.cursor.execute("UPDATE quizzes_checking SET is_right = ?, date_checked=strftime('%s','now') "
-                                   "WHERE checker_user_id = ? AND id_quizzes = "
-                                   "(SELECT id_quizzes FROM quizzes_checking "
-                                   "WHERE checker_user_id = ? ORDER BY date_started DESC LIMIT 1)",
-                                   (mark, user_id, user_id))
+                            "WHERE checker_user_id = ? AND id_quizzes = "
+                            "(SELECT id_quizzes FROM quizzes_checking "
+                            "WHERE checker_user_id = ? ORDER BY date_started DESC LIMIT 1)",
+                            (mark, user_id, user_id))
         self.connection.commit()
-
 
     def get_num_checked(self, user_id):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
@@ -194,6 +192,49 @@ class SQLighter:
         marks['Question'] = marks['Question'].apply(lambda x: x[-1:])
         return marks
 
+    def get_quizzes_stat(self, quiz_name):
+        unique_people_passed = self.cursor.execute("SELECT count(quizzes.user_id) "
+                                                   "FROM quizzes WHERE quiz_name = ?", (quiz_name,)).fetchall()
+        unique_people_passed = unique_people_passed[0][0] if len(unique_people_passed) > 0 else 0
+
+        quizzes_more3_checked = self.cursor.execute("SELECT quizzes.user_id, "
+                                                    "avg(B.check_nums), count(B.check_nums) "
+                                                    "FROM quizzes INNER JOIN "
+                                                    "(SELECT quizzes_checking.id_quizzes, "
+                                                    "count(quizzes_checking.date_checked) check_nums "
+                                                    "FROM quizzes_checking "
+                                                    "GROUP BY quizzes_checking.id_quizzes) B "
+                                                    "ON quizzes.id = B.id_quizzes "
+                                                    "WHERE quizzes.quiz_name = ? "
+                                                    "AND B.check_nums >= 3 GROUP BY quizzes.user_id",
+                                                    (quiz_name,)).fetchall()
+
+        quizzes_checked_all = self.cursor.execute("SELECT quizzes.user_id, "
+                                                  "avg(B.check_nums), count(B.check_nums) "
+                                                  "FROM quizzes INNER JOIN "
+                                                  "(SELECT quizzes_checking.id_quizzes, "
+                                                  "count(quizzes_checking.date_checked) check_nums "
+                                                  "FROM quizzes_checking "
+                                                  "GROUP BY quizzes_checking.id_quizzes) B "
+                                                  "ON quizzes.id = B.id_quizzes "
+                                                  "WHERE quizzes.quiz_name = ? "
+                                                  "AND B.check_nums >= 1 GROUP BY quizzes.user_id",
+                                                  (quiz_name,)).fetchall()
+
+        num_people_checked_one_question = self.cursor.execute("SELECT count(DISTINCT quizzes_checking.checker_user_id) "
+                                                              "FROM quizzes_checking LEFT JOIN quizzes "
+                                                              "ON quizzes.id = quizzes_checking.id_quizzes "
+                                                              "WHERE quizzes.quiz_name = ? "
+                                                              "AND quizzes_checking.is_right IS NOT NULL",
+                                                              (quiz_name,)).fetchall()
+        num_people_checked_one_question = num_people_checked_one_question[0][0] if len(
+            num_people_checked_one_question) > 0 else 0
+
+        return {'num_unique_people': unique_people_passed,
+                'num_truly_checked_quizzes': len(quizzes_more3_checked),
+                'num_all_checked_quizzes': len(quizzes_checked_all),
+                'num_people_checkers': num_people_checked_one_question}
+
     def get_checked_works_stat(self):
         return self.cursor.execute("SELECT hw.hw_num, count(hw_checking.file_id) checks_count "
                                    "FROM hw LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
@@ -228,11 +269,12 @@ class SQLighter:
                                        "VALUES (?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))",
                                        (user_id, quiz_name, question_name,
                                         is_right, usr_ans, question_text, true_ans))
+
     def close(self):
         self.connection.close()
 
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    lol = sql.get_number_checked_quizzes('metya')
-    print(lol)
+    # lol = sql.get_quizzes_stat(' 1')
+    # print(lol)

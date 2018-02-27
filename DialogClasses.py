@@ -4,15 +4,20 @@ from telebot import types
 from collections import defaultdict
 from Sqlighter import SQLighter
 import logging
+from collections import OrderedDict
+import pickle
+import config
 
 
 class State:
     def __init__(self, name: str,
-                 triggers_out: Dict = None,
+                 triggers_out: OrderedDict = None,
                  hidden_states: Dict = None,
                  welcome_msg: str = None,
                  row_width=1,
-                 handler_welcome: Callable = None):
+                 load=config.load_states,
+                 handler_welcome: Callable = None,
+                 *args):
         """
         :param name: name of state object;
         :param triggers_out: dict like {state_out1_name:{'phrases':['some_string1', 'str2', etc],
@@ -29,8 +34,21 @@ class State:
         self.triggers_out = triggers_out
         self.handler_welcome = handler_welcome
         self.row_width = row_width
+        self.load = load
         self.reply_markup = self.make_reply_markup()
+        self.additional_init(*args)
+        if load:
+            self.load_current_states()
         print('STATE {} obj has been initialized\n'.format(self.name))
+
+    def dump_current_states(self):
+        pass
+
+    def load_current_states(self):
+        pass
+
+    def additional_init(self, *args):
+        pass
 
     def make_reply_markup(self):
 
@@ -45,7 +63,7 @@ class State:
                 for txt in attrib['phrases']:
                     tmp_buttons.append(txt)
                 is_markup_filled = True
-        tmp_buttons = sorted(tmp_buttons)
+
         markup.add(*(types.KeyboardButton(button) for button in tmp_buttons))
         if not is_markup_filled:
             markup = types.ReplyKeyboardRemove()
@@ -105,7 +123,8 @@ class State:
 
 
 class DialogGraph:
-    def __init__(self, bot, root_state: str, nodes: List[State], sqldb: SQLighter, logger: logging):
+    def __init__(self, bot, root_state: str, nodes: List[State], sqldb: SQLighter, logger: logging,
+                 dump_path: str = config.dump_graph_path, load_from_dump: bool = config.load_graph):
         """
         Instance of this class manages all the dialog flow;
         :param bot: telebot.TeleBot(token);
@@ -120,9 +139,23 @@ class DialogGraph:
         self.usr_states = defaultdict(dict)
         self.sqldb = sqldb
         self.logger = logger
+        self.dump_path = dump_path
+        self.load = load_from_dump
 
     def make_nodes_dict(self, nodes):
         return {state.name: state for state in nodes}
+
+    def dump_current_states(self):
+        with open(self.dump_path, 'wb') as fout:
+            pickle.dump({'states': self.usr_states}, fout)
+
+    def load_current_states(self):
+        try:
+            with open(self.dump_path, 'rb') as fin:
+                unpickled = pickle.load(fin)
+                self.usr_states = unpickled['usr_states']
+        except FileNotFoundError:
+            pass
 
     def run(self, message):
 
@@ -145,4 +178,16 @@ class DialogGraph:
         if new_state_name is not None:
             self.logger.debug("USR: " + message.chat.username + " NEW STATE: " + new_state_name)
             self.usr_states[message.chat.id]['current_state'] = new_state_name
-            self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)
+            signal = self.nodes[new_state_name].welcome_handler(self.bot, message, self.sqldb)
+            if signal == 'BACKUP_NOW':
+                self.dump_current_states()
+                for name_node, node in self.nodes.items():
+                    try:
+                        node.dump_current_states()
+                        print(name_node + ' has been dumped')
+                    except Exception as e:
+                        print(
+                            "-- ERROR DUMP: {} with exception {}:\n {}".format(name_node, e.__class__.__name__, str(e)))
+                        continue
+
+                self.bot.send_message(text="All_dumped", chat_id=message.chat.id)

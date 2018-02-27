@@ -10,20 +10,20 @@ from collections import OrderedDict
 import dill
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
-                             triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['/start'], 'content_type': 'text'}}))
+                             triggers_out=OrderedDict(MAIN_MENU={'phrases': [' / start'], 'content_type': 'text'}))
 # ----------------------------------------------------------------------------
 
 main_menu = State(name='MAIN_MENU',
                   row_width=2,
                   triggers_out=OrderedDict(
-                      {'TAKE_QUIZ': {'phrases': [universal_reply.quiz_enter], 'content_type': 'text'},
-                       'PASS_HW_NUM_SELECT': {'phrases': [universal_reply.hw_enter], 'content_type': 'text'},
-                       'CHECK_QUIZ': {'phrases': [universal_reply.quiz_check], 'content_type': 'text'},
-                       'CHECK_HW_NUM_SELECT': {'phrases': [universal_reply.hw_check], 'content_type': 'text'},
-                       'GET_QUIZ_MARK': {'phrases': [universal_reply.quiz_estimates], 'content_type': 'text'},
-                       'GET_MARK': {'phrases': [universal_reply.hw_estimates], 'content_type': 'text'},
-                       'ASK_QUESTION_START': {'phrases': [universal_reply.ask_question], 'content_type': 'text'},
-                       'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}}),
+                      TAKE_QUIZ={'phrases': [universal_reply.quiz_enter], 'content_type': 'text'},
+                      PASS_HW_NUM_SELECT={'phrases': [universal_reply.hw_enter], 'content_type': 'text'},
+                      CHECK_QUIZ={'phrases': [universal_reply.quiz_check], 'content_type': 'text'},
+                      CHECK_HW_NUM_SELECT={'phrases': [universal_reply.hw_check], 'content_type': 'text'},
+                      GET_QUIZ_MARK={'phrases': [universal_reply.quiz_estimates], 'content_type': 'text'},
+                      GET_MARK={'phrases': [universal_reply.hw_estimates], 'content_type': 'text'},
+                      ASK_QUESTION_START={'phrases': [universal_reply.ask_question], 'content_type': 'text'},
+                      ADMIN_MENU={'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}),
                   hidden_states={'state_name': 'ADMIN_MENU', 'users_file': config.admins},
                   welcome_msg='Выберите доступное действие, пожалуйста')
 
@@ -41,11 +41,11 @@ class QuizState(State):
     def dump_current_states(self):
         with open(self.dump_path, 'wb') as fout:
             dill.dump({'usersteps': self.quiz.usersteps,
-                         'submitted': self.quiz.usr_submitted,
-                         'paused': self.quiz.paused,
-                         'usr_buttons': {q.name: q.usr_buttons for q in self.quiz.questions},
-                         'usr_answers': {q.name: q.usr_answers for q in self.quiz.questions}
-                         }, fout)
+                       'submitted': self.quiz.usr_submitted,
+                       'paused': self.quiz.paused,
+                       'usr_buttons': {q.name: q.usr_buttons for q in self.quiz.questions},
+                       'usr_answers': {q.name: q.usr_answers for q in self.quiz.questions}
+                       }, fout)
             print('---- QUIZ dumped')
 
     def load_current_states(self):
@@ -89,9 +89,9 @@ take_quiz = QuizState(name='TAKE_QUIZ')
 # ----------------------------------------------------------------------------
 
 check_quiz = State(name='CHECK_QUIZ',
-                   triggers_out=OrderedDict({
-                       'SEND_QQUESTION_TO_CHECK': {'phrases': config.quizzes_possible_to_check, 'content_type': 'text'},
-                       'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}}),
+                   triggers_out=OrderedDict(
+                       SEND_QQUESTION_TO_CHECK={'phrases': config.quizzes_possible_to_check, 'content_type': 'text'},
+                       MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
                    welcome_msg='Пожалуйста, выберите номер квиза для проверки:')
 
 
@@ -124,9 +124,9 @@ def send_qquestion(bot, message, sqldb):
 
 send_quiz_question_to_check = State(name='SEND_QQUESTION_TO_CHECK',
                                     row_width=2,
-                                    triggers_out=OrderedDict({'SAVE_MARK': {'phrases': ['Верю', 'Не верю']},
-                                                              'MAIN_MENU': {'phrases': ['Назад'],
-                                                                            'content_type': 'text'}}),
+                                    triggers_out=OrderedDict(SAVE_MARK={'phrases': ['Верю', 'Не верю']},
+                                                             MAIN_MENU={'phrases': ['Назад'],
+                                                                        'content_type': 'text'}),
                                     handler_welcome=send_qquestion,
                                     welcome_msg='🌻 Правильно или нет ответил пользователь?\n'
                                                 'Нажмите кнопку, чтобы оценить ответ.')
@@ -142,16 +142,16 @@ def mark_saving_quiz(bot, message, sqldb):
 
 save_mark_quiz = State(name='SAVE_MARK',
                        row_width=2,
-                       triggers_out=OrderedDict({'SEND_QQUESTION_TO_CHECK': {'phrases': ['Продолжить проверку']},
-                                                 'CHECK_QUIZ': {'phrases': ['Назад']}}),
+                       triggers_out=OrderedDict(SEND_QQUESTION_TO_CHECK={'phrases': ['Продолжить проверку']},
+                                                CHECK_QUIZ={'phrases': ['Назад']}),
                        handler_welcome=mark_saving_quiz,
                        welcome_msg='🌻 Желаете ли еще проверить ответы из того же квиза?')
 
 # ----------------------------------------------------------------------------
 
 ask_question_start = State(name='ASK_QUESTION_START',
-                           triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'},
-                                                     'SAVE_QUESTION': {'phrases': [], 'content_type': 'text'}}),
+                           triggers_out=OrderedDict(MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'},
+                                                    SAVE_QUESTION={'phrases': [], 'content_type': 'text'}),
                            welcome_msg='Сформулируйте вопрос к семинаристу и отправьте его одним сообщением 🐠.')
 
 
@@ -162,8 +162,8 @@ def save_question_handler(bot, message, sqldb):
 
 
 save_question = State(name='SAVE_QUESTION',
-                      triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'},
-                                                'SAVE_QUESTION': {'phrases': [], 'content_type': 'text'}}),
+                      triggers_out=OrderedDict(MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'},
+                                               SAVE_QUESTION={'phrases': [], 'content_type': 'text'}),
                       handler_welcome=save_question_handler,
                       welcome_msg='Спасибо за вопрос. Хорошего дня 🐯 :)\n'
                                   'Если желаете задать еще вопрос, напишите его сразу следующим сообщением.'
@@ -175,9 +175,9 @@ welcome_to_pass_msg = 'Пожалуйста, выберите номер зад�
 welcome_to_return_msg = 'Доступные для сдачи задания отсутствуют.'
 pass_hw_num_selection = State(name='PASS_HW_NUM_SELECT',
                               row_width=2,
-                              triggers_out=OrderedDict({'PASS_HW_CHOSEN_NUM': {'phrases': config.hw_possible_to_pass,
-                                                                               'content_type': 'text'},
-                                                        'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}}),
+                              triggers_out=OrderedDict(PASS_HW_CHOSEN_NUM={'phrases': config.hw_possible_to_pass,
+                                                                           'content_type': 'text'},
+                                                       MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
                               welcome_msg=welcome_to_pass_msg if len(config.hw_possible_to_pass) > 0
                               else welcome_to_return_msg)
 
@@ -189,9 +189,8 @@ def make_fake_db_record(bot, message, sqldb):
 
 
 pass_hw_chosen_num = State(name='PASS_HW_CHOSEN_NUM',
-                           triggers_out=OrderedDict({'PASS_HW_UPLOAD': {'phrases': [], 'content_type': 'document'},
-                                                     'PASS_HW_NUM_SELECT': {'phrases': ['Назад'],
-                                                                            'content_type': 'text'}}),
+                           triggers_out=OrderedDict(PASS_HW_UPLOAD={'phrases': [], 'content_type': 'document'},
+                                                    PASS_HW_NUM_SELECT={'phrases': ['Назад'], 'content_type': 'text'}),
                            handler_welcome=make_fake_db_record,
                            welcome_msg='Пришлите файл **(один архив или один Jupyter notebook)** весом не более 20 Мб.')
 
@@ -227,12 +226,13 @@ class HwUploadState(State):
 
 
 pass_hw_upload = HwUploadState(name='PASS_HW_UPLOAD',
-                               triggers_out=OrderedDict({
-                                   'PASS_HW_NUM_SELECT': {'phrases': ['Сдать еще одно дз'], 'content_type': 'text'},
-                                   'MAIN_MENU': {'phrases': ['Меню'], 'content_type': 'text'}}))
+                               triggers_out=OrderedDict(
+                                   PASS_HW_NUM_SELECT={'phrases': ['Сдать еще одно дз'], 'content_type': 'text'},
+                                   MAIN_MENU={'phrases': ['Меню'], 'content_type': 'text'}))
 
 
 # ----------------------------------------------------------------------------
+
 
 def show_marks_table(bot, message, sqldb):
     num_checked = sqldb.get_num_checked(message.chat.username)
@@ -286,7 +286,7 @@ def show_marks_table(bot, message, sqldb):
 
 
 get_mark = State(name='GET_MARK',
-                 triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}}),
+                 triggers_out=OrderedDict(MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
                  handler_welcome=show_marks_table,
                  welcome_msg='Такие дела)')
 
@@ -326,7 +326,7 @@ def get_marks_table_quiz(bot, message, sqldb):
 
 
 get_quiz_mark = State(name='GET_QUIZ_MARK',
-                      triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}}),
+                      triggers_out=OrderedDict(MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
                       handler_welcome=get_marks_table_quiz,
                       welcome_msg='Good Luck:)')
 
@@ -334,10 +334,9 @@ get_quiz_mark = State(name='GET_QUIZ_MARK',
 
 welcome_check_hw = 'Выберите номер задания для проверки' if len(config.hw_possible_to_check) > 0 \
     else 'Нет доступных для проверки заданий. Выпейте чаю, отдохните.'
-check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT',
-                               triggers_out=OrderedDict({'CHECK_HW_SEND': {'phrases': config.hw_possible_to_check,
-                                                                           'content_type': 'text'},
-                                                         'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}}),
+check_hw_num_selection = State(name='CHECK_HW_NUM_SELECT', triggers_out=OrderedDict(
+    CHECK_HW_SEND={'phrases': config.hw_possible_to_check, 'content_type': 'text'},
+    MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
                                welcome_msg=welcome_check_hw,
                                row_width=2)
 
@@ -359,8 +358,8 @@ def choose_file_and_send(bot, message, sqldb):
 
 
 check_hw_send = State(name='CHECK_HW_SEND',
-                      triggers_out=OrderedDict({'CHECK_HW_SAVE_MARK': {'phrases': config.marks,
-                                                                       'content_type': 'text'}}),
+                      triggers_out=OrderedDict(CHECK_HW_SAVE_MARK={'phrases': config.marks,
+                                                                   'content_type': 'text'}),
                       handler_welcome=choose_file_and_send,
                       row_width=3,
                       welcome_msg="Пожалуйста, оцените работу.")
@@ -373,10 +372,9 @@ def save_mark(bot, message, sqldb):
 
 
 check_hw_save_mark = State(name='CHECK_HW_SAVE_MARK',
-                           triggers_out=OrderedDict({'CHECK_HW_NUM_SELECT': {'phrases': ['Проверить еще одну работу'],
-                                                                             'content_type': 'text'},
-                                                     'MAIN_MENU': {'phrases': ['Меню'],
-                                                                   'content_type': 'text'}}),
+                           triggers_out=OrderedDict(CHECK_HW_NUM_SELECT={'phrases': ['Проверить еще одну работу'],
+                                                                         'content_type': 'text'},
+                                                    MAIN_MENU={'phrases': ['Меню'], 'content_type': 'text'}),
                            welcome_msg='Спасибо за проверенную работу:)',
                            handler_welcome=save_mark)
 
@@ -384,13 +382,11 @@ check_hw_save_mark = State(name='CHECK_HW_SAVE_MARK',
 
 admin_menu = State(name='ADMIN_MENU',
                    row_width=3,
-                   triggers_out=OrderedDict({
-                       'KNOW_NEW_QUESTIONS': {'phrases': ['Questions'], 'content_type': 'text'},
-                       'SEE_HW_STAT': {'phrases': ['Homeworks'], 'content_type': 'text'},
-                       'SEE_QUIZZES_STAT': {'phrases': ['Quizzes'], 'content_type': 'text'},
-                       'MAIN_MENU': {'phrases': ['MainMenu'], 'content_type': 'text'},
-                       'MAKE_BACKUP': {'phrases': ['MakeBackup'], 'content_type': 'text'}
-                   }),
+                   triggers_out=OrderedDict(KNOW_NEW_QUESTIONS={'phrases': ['Questions'], 'content_type': 'text'},
+                                            SEE_HW_STAT={'phrases': ['Homeworks'], 'content_type': 'text'},
+                                            SEE_QUIZZES_STAT={'phrases': ['Quizzes'], 'content_type': 'text'},
+                                            MAIN_MENU={'phrases': ['MainMenu'], 'content_type': 'text'},
+                                            MAKE_BACKUP={'phrases': ['MakeBackup'], 'content_type': 'text'}),
                    welcome_msg='Добро пожаловать, о Великий Одмен!')
 
 
@@ -401,8 +397,8 @@ def make_backup_now(bot, message, sqldb):
 
 
 make_backup = State(name='MAKE_BACKUP',
-                    triggers_out=OrderedDict({'ADMIN_MENU': {'phrases': ['Назад в админку'],
-                                                             'content_type': 'text'}}),
+                    triggers_out=OrderedDict(ADMIN_MENU={'phrases': ['Назад в админку'],
+                                                         'content_type': 'text'}),
                     handler_welcome=make_backup_now,
                     welcome_msg='Working on pickling objects...')
 
@@ -417,8 +413,8 @@ def get_quizzes_stat(bot, message, sqldb):
 
 
 see_quizzes_stat = State(name='SEE_QUIZZES_STAT',
-                         triggers_out=OrderedDict({'ADMIN_MENU': {'phrases': ['Назад в админку'],
-                                                                  'content_type': 'text'}}),
+                         triggers_out=OrderedDict(ADMIN_MENU={'phrases': ['Назад в админку'],
+                                                              'content_type': 'text'}),
                          handler_welcome=get_quizzes_stat,
                          welcome_msg='Это все 👽')
 
@@ -438,8 +434,8 @@ def get_questions(bot, message, sqldb):
 
 
 know_new_questions = State(name='KNOW_NEW_QUESTIONS',
-                           triggers_out=OrderedDict({'ADMIN_MENU': {'phrases': ['Назад в админку'],
-                                                                    'content_type': 'text'}}),
+                           triggers_out=OrderedDict(ADMIN_MENU={'phrases': ['Назад в админку'],
+                                                                'content_type': 'text'}),
                            handler_welcome=get_questions,
                            welcome_msg='Это все 👽')
 
@@ -458,7 +454,7 @@ def get_hw_stat(bot, message, sqldb):
 
 
 see_hw_stat = State(name='SEE_HW_STAT',
-                    triggers_out=OrderedDict({'ADMIN_MENU': {'phrases': ['Назад в админку'], 'content_type': 'text'}}),
+                    triggers_out=OrderedDict(ADMIN_MENU={'phrases': ['Назад в админку'], 'content_type': 'text'}),
                     handler_welcome=get_hw_stat,
                     welcome_msg='Это все что есть проверенного.\nЕсли какого номера тут нет, значит его не проверили.')
 

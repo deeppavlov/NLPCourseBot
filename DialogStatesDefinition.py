@@ -71,9 +71,12 @@ class QuizState(State):
             if not hasattr(self, 'back_keyboard'):
                 self.back_keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
                 self.back_keyboard.add(types.KeyboardButton('Назад'))
-            bot.send_message(chat_id=message.chat.id,
-                             text="Sorry, you have already submitted {} ~_~\"".format(self.quiz.name),
-                             reply_markup=self.back_keyboard)
+            if config.quiz_closed:
+                bot.send_message(text='Quiz closed', chat_id=message.chat.id, reply_markup=self.back_keyboard)
+            else:
+                bot.send_message(chat_id=message.chat.id,
+                                 text="Sorry, you have already submitted {} ~_~\"".format(self.quiz.name),
+                                 reply_markup=self.back_keyboard)
 
     def out_handler(self, bot, message, sqldb: SQLighter):
         if message.content_type != 'text':

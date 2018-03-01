@@ -274,7 +274,6 @@ class Quiz:
         """
 
         if config.quiz_closed:
-            bot.send_message(chat_id=message.from_user.id, text='Квиз закрыт для сдачи.')
             return self.next_global_state_name
 
         chat_id = message.chat.id

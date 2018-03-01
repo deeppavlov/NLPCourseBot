@@ -103,10 +103,11 @@ class SQLighter:
         if len(result) > 0:
             return result[0][0]
 
-    def get_number_checked_quizzes(self, user_id):
+    def get_number_checked_quizzes(self, user_id, quiz_name):
         result = self.cursor.execute("SELECT count(quizzes_checking.id_quizzes) "
-                                     "FROM quizzes_checking WHERE checker_user_id = ? "
-                                     "AND is_right IS NOT NULL", (user_id,)).fetchall()
+                                     "FROM quizzes_checking JOIN quizzes ON quizzes.id=quizzes_checking.id_quizzes "
+                                     "WHERE checker_user_id = ? AND quizzes.quiz_name = ?"
+                                     "AND quizzes_checking.is_right IS NOT NULL", (user_id, quiz_name)).fetchall()
         if len(result) > 0:
             return result[0][0]
         return 0

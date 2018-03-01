@@ -33,7 +33,7 @@ main_menu = State(name='MAIN_MENU',
 
 class QuizState(State):
     def additional_init(self):
-        self.quiz = Quiz(config.quiz_name, quiz_json_path=config.quiz_path,
+        self.quiz = Quiz(config.current_quiz_name, quiz_json_path=config.quiz_path,
                          next_global_state_name='MAIN_MENU')
         # TODO: do smth to provide arguments in the right way
         self.dump_path = config.dump_quiz_path
@@ -98,8 +98,6 @@ check_quiz = State(name='CHECK_QUIZ',
 # ----------------------------------------------------------------------------
 
 def send_qquestion(bot, message, sqldb):
-    num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
-
     if message.text not in config.quizzes_possible_to_check:
         quiz_name = sqldb.get_latest_quiz_name(message.chat.username)
     else:
@@ -107,6 +105,8 @@ def send_qquestion(bot, message, sqldb):
     if quiz_name is None:
         bot.send_message("SMTH WENT WRONG..")
         return
+
+    num_checked = sqldb.get_number_checked_quizzes(user_id=message.chat.username, quiz_name=quiz_name)
     arr = sqldb.get_quiz_question_to_check(quiz_name=quiz_name,
                                            user_id=message.chat.username)
     if len(arr) > 0:
@@ -293,7 +293,7 @@ get_mark = State(name='GET_MARK',
 
 # ----------------------------------------------------------------------------
 def get_marks_table_quiz(bot, message, sqldb):
-    num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
+    num_checked = sqldb.get_number_checked_quizzes(message.chat.username, quiz_name=config.current_quiz_name)
     if num_checked < config.quizzes_need_to_check:
         bot.send_message(chat_id=message.chat.id,
                          text='🌳🌻 Вы проверили {} квизов. '

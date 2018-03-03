@@ -7,6 +7,7 @@ import pandas as pd
 from quizzes.QuizClasses import Quiz
 from tabulate import tabulate
 from collections import OrderedDict
+from telebot import util
 import dill
 
 wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
@@ -296,36 +297,35 @@ get_mark = State(name='GET_MARK',
 
 # ----------------------------------------------------------------------------
 def get_marks_table_quiz(bot, message, sqldb):
-    num_checked = sqldb.get_number_checked_quizzes(message.chat.username, quiz_name=config.current_quiz_name)
-    if num_checked < config.quizzes_need_to_check:
-        bot.send_message(chat_id=message.chat.id,
-                         text='🌳🌻 Вы проверили {} квизов. '
-                              'Необходимо проверить еще {} квизов,'
-                              ' чтобы узнать свою оценку.'.format(num_checked,
-                                                                  config.quizzes_need_to_check - num_checked))
-        return
-    table = sqldb.get_marks_quiz(user_id=message.chat.username)
-    if table.empty:
-        bot.send_message(chat_id=message.chat.id,
-                         text="Пока никто не проверил ваши квизы или вы их вообще не сдавали.\n"
-                              "Возвращайтесь позже.🌳🌻 ")
-        return
-    finals = defaultdict(list)
-    for quiz, df in table.groupby('Quiz'):
-        if len(df) < 5:
-            continue
+    num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
+    print(num_checked)
+    for quiz_name, num in num_checked:
+        if num < config.quizzes_need_to_check and quiz_name in config.quizzes_possible_to_check:
+            bot.send_message(chat_id=message.chat.id,
+                             text='🌳🌻 Вы проверили {} квизов для {}. '
+                                  'Необходимо проверить еще {} квизов,'
+                                  ' чтобы узнать свою оценку по этому квизу.'.format(num, quiz_name,
+                                                                            config.quizzes_need_to_check - num))
+            return
+        df = sqldb.get_marks_quiz(user_id=message.chat.username, quiz_name=quiz_name)
+        if df.empty:
+            bot.send_message(chat_id=message.chat.id,
+                             text="Пока никто не проверил ваш квиз {} или вы его вообще не сдавали.\n"
+                                  "Возвращайтесь позже.🌳🌻 ".format(quiz_name))
+            return
+        finals = defaultdict(list)
         for i, row in df.iterrows():
-            text = '*' + quiz + '*\n' + '=' * 20 + '\n'
+            text = '*' + quiz_name + '*\n' + '=' * 20 + '\n'
             text += row.QuestionText + '\n' + '=' * 20 + '\n' + '*Your Answer: *\n' \
                     + str(row.YourAnswer) + '\n*Score: *' + str(row.Score)
             if not pd.isna(row.NumChecks):
                 text += '\n*Checked for [{}] times*'.format(row.NumChecks)
             bot.send_message(text=text, chat_id=message.chat.id, parse_mode='Markdown')
         mark = '{}/{}'.format(int(sum(df.Score)), len(df))
-        finals['quiz'].append(quiz)
+        finals['quiz'].append(quiz_name)
         finals['mark'].append(mark)
-    bot.send_message(text='<code>' + tabulate(finals, headers='keys', tablefmt="fancy_grid") + '</code>',
-                     chat_id=message.chat.id, parse_mode='html')
+        bot.send_message(text='<code>' + tabulate(finals, headers='keys', tablefmt="fancy_grid") + '</code>',
+                         chat_id=message.chat.id, parse_mode='html')
 
 
 get_quiz_mark = State(name='GET_QUIZ_MARK',
@@ -350,7 +350,9 @@ def choose_file_and_send(bot, message, sqldb):
     # TODO: do smth to fix work with empty hw set;
     # TODO: OH MY GOD! people should check only work that they have done!!!!
 
-    file_ids = sqldb.get_file_ids(hw_num=message.text, number_of_files=3, user_id=message.chat.username)
+    file_ids = sqldb.get_file_ids(hw_num=message.text,
+                                  number_of_files=3,
+                                  user_id=message.chat.username)
     if len(file_ids) > 0:
         chosen_file = random.choice(file_ids)[0]
         sqldb.write_check_hw_ids(message.chat.username, chosen_file)
@@ -409,10 +411,14 @@ make_backup = State(name='MAKE_BACKUP',
 # ----------------------------------------------------------------------------
 
 def get_quizzes_stat(bot, message, sqldb):
-    quizzes_stat = sqldb.get_quizzes_stat(config.stat_quiz_name)
-    bot.send_message(
-        text='<code>' + tabulate(pd.DataFrame(quizzes_stat, index=[0]).T, tablefmt="fancy_grid") + '</code>',
-        chat_id=message.chat.id, parse_mode='html')
+    for quiz_name in config.quizzes_possible_to_check:
+        quizzes_stat = sqldb.get_quizzes_stat(quiz_name)
+        bot.send_message(text="*FOR {}*".format(quiz_name),
+                         chat_id=message.chat.id,
+                         parse_mode='Markdown')
+        bot.send_message(
+            text='<code>' + tabulate(pd.DataFrame(quizzes_stat, index=[0]).T, tablefmt="fancy_grid") + '</code>',
+            chat_id=message.chat.id, parse_mode='html')
 
 
 see_quizzes_stat = State(name='SEE_QUIZZES_STAT',
@@ -430,7 +436,11 @@ def get_questions(bot, message, sqldb):
         res = '*Questions for the last week*\n'
         for user_id, question, date in questions:
             res += '👽 User: *' + user_id + '* asked at *' + date + '*:\n' + question + '\n\n'
-        bot.send_message(message.chat.id, res, parse_mode='Markdown')
+        # Split the text each 3000 characters.
+        # split_string returns a list with the splitted text.
+        splitted_text = util.split_string(res, 3000)
+        for text in splitted_text:
+            bot.send_message(message.chat.id, text)
     else:
         bot.send_message(message.chat.id, '_Нет ничего новенького за последние 7 дней, к сожалению_:(',
                          parse_mode='Markdown')

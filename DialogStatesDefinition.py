@@ -110,7 +110,8 @@ def send_qquestion(bot, message, sqldb):
         bot.send_message("SMTH WENT WRONG..")
         return
 
-    num_checked = sqldb.get_number_checked_for_one_quiz(user_id=message.chat.username, quiz_name=quiz_name)
+    num_checked = sqldb.get_number_checked_for_one_quiz(user_id=message.chat.username,
+                                                        quiz_name=quiz_name)
     arr = sqldb.get_quiz_question_to_check(quiz_name=quiz_name,
                                            user_id=message.chat.username)
     if len(arr) > 0:
@@ -122,7 +123,7 @@ def send_qquestion(bot, message, sqldb):
                          text=text, )
     else:
         # TODO: do smth with empty db;
-        bot.send_message(text='К сожалению проверить пока нечего.',
+        bot.send_message(text='К сожалению проверить пока нечего. Нажмите, пожалуйста, кнопку "Назад".',
                          chat_id=message.chat.id)
 
 

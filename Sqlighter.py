@@ -67,6 +67,7 @@ class SQLighter:
         """ Make empty record for this quiz_name & user_id"""
         self.cursor.execute("INSERT INTO quizzes_checking (checker_user_id, id_quizzes, date_started)"
                             " VALUES (?, ?, strftime('%s','now'))", (user_id, q_id))
+        self.connection.commit()
 
     def upd_homework(self, user_id, file_id):
         """ UPD the latest record of user_id with file_id """
@@ -96,11 +97,10 @@ class SQLighter:
 
     def get_latest_quiz_name(self, user_id):
         result = self.cursor.execute("SELECT quizzes.quiz_name "
-                                     "FROM quizzes LEFT OUTER JOIN quizzes_checking "
+                                     "FROM quizzes JOIN quizzes_checking "
                                      "ON quizzes.id = quizzes_checking.id_quizzes "
                                      "WHERE quizzes_checking.checker_user_id = ? "
                                      "AND quizzes_checking.is_right IS NOT NULL "
-                                     "GROUP BY quizzes.quiz_name "
                                      "ORDER BY quizzes_checking.date_checked DESC LIMIT 1", (user_id,)).fetchall()
         if len(result) > 0:
             return result[0][0]
@@ -128,17 +128,20 @@ class SQLighter:
     def get_quiz_question_to_check(self, quiz_name, user_id):
         # TODO: fix processing of '' user answers;
         array = self.cursor.execute(
-            "SELECT quizzes.id, quizzes.question_name, quizzes.question_text, quizzes.usr_answer, "
+            "SELECT quizzes.id, quizzes.question_name,"
+            "quizzes.question_text, quizzes.usr_answer, "
             "count(quizzes_checking.id_quizzes) checks "
-            "FROM quizzes LEFT OUTER JOIN quizzes_checking "
+            "FROM quizzes "
+            "left JOIN quizzes_checking "
             "ON quizzes.id = quizzes_checking.id_quizzes "
+            "AND quizzes_checking.checker_user_id = ? "
             "WHERE quizzes.user_id != ? "
             "AND quizzes.quiz_name = ? "
             "AND quizzes.usr_answer IS NOT NULL "
-            # "AND quizzes.usr_answer IS NOT '' "
             "AND quizzes.true_ans IS NULL "
-            # "AND quizzes_checking.checker_user_id != ?"
-            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1", (user_id, quiz_name,)).fetchall()
+            "AND quizzes_checking.checker_user_id IS null "
+            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1",
+            (user_id, user_id, quiz_name)).fetchall()
         if len(array) > 0:
             return array[0]
         return array

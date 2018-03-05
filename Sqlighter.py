@@ -84,7 +84,9 @@ class SQLighter:
                                    "FROM hw "
                                    "LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
                                    "WHERE hw.file_id IS NOT NULL "
-                                   "AND hw.hw_num = :hw_num AND hw.user_id != :usr_id "
+                                   "AND hw.hw_num = :hw_num "
+                                   "AND hw.user_id != :usr_id "
+                                   "AND (hw_checking.user_id != :usr_id OR hw_checking.date_checked IS NULL) "
                                    "GROUP BY hw.file_id "
                                    "ORDER BY checks_count "
                                    "LIMIT :num_files",
@@ -112,6 +114,16 @@ class SQLighter:
         # if len(result) > 0:
         #     return result[0][0]
         return result
+
+    def get_number_checked_for_one_quiz(self, user_id, quiz_name):
+        result = self.cursor.execute("SELECT count(quizzes_checking.id_quizzes) "
+                                     "FROM quizzes_checking JOIN quizzes ON quizzes.id=quizzes_checking.id_quizzes "
+                                     "WHERE checker_user_id = ? AND quiz_name = ?"
+                                     "AND quizzes_checking.is_right IS NOT NULL "
+                                     , (user_id, quiz_name,)).fetchall()
+        if len(result) > 0:
+            return result[0][0]
+        return 0
 
     def get_quiz_question_to_check(self, quiz_name, user_id):
         # TODO: fix processing of '' user answers;
@@ -281,5 +293,5 @@ class SQLighter:
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    lol = sql.get_marks_quiz('maluginaaa', 'quiz 2')
+    lol = sql.get_marks_quiz('', 'quiz 2')
     print(lol)

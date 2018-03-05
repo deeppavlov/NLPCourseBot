@@ -110,7 +110,7 @@ def send_qquestion(bot, message, sqldb):
         bot.send_message("SMTH WENT WRONG..")
         return
 
-    num_checked = sqldb.get_number_checked_quizzes(user_id=message.chat.username, quiz_name=quiz_name)
+    num_checked = sqldb.get_number_checked_for_one_quiz(user_id=message.chat.username, quiz_name=quiz_name)
     arr = sqldb.get_quiz_question_to_check(quiz_name=quiz_name,
                                            user_id=message.chat.username)
     if len(arr) > 0:
@@ -298,7 +298,6 @@ get_mark = State(name='GET_MARK',
 # ----------------------------------------------------------------------------
 def get_marks_table_quiz(bot, message, sqldb):
     num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
-    print(num_checked)
     for quiz_name, num in num_checked:
         if num < config.quizzes_need_to_check and quiz_name in config.quizzes_possible_to_check:
             bot.send_message(chat_id=message.chat.id,
@@ -321,7 +320,8 @@ def get_marks_table_quiz(bot, message, sqldb):
             if not pd.isna(row.NumChecks):
                 text += '\n*Checked for [{}] times*'.format(row.NumChecks)
             bot.send_message(text=text, chat_id=message.chat.id, parse_mode='Markdown')
-        mark = '{}/{}'.format(int(sum(df.Score)), len(df))
+        final_score = int(sum(df.Score)) if (not pd.isna(sum(df.Score))) else 0
+        mark = '{}/{}'.format(final_score, len(df))
         finals['quiz'].append(quiz_name)
         finals['mark'].append(mark)
         bot.send_message(text='<code>' + tabulate(finals, headers='keys', tablefmt="fancy_grid") + '</code>',
@@ -364,7 +364,8 @@ def choose_file_and_send(bot, message, sqldb):
 
 check_hw_send = State(name='CHECK_HW_SEND',
                       triggers_out=OrderedDict(CHECK_HW_SAVE_MARK={'phrases': config.marks,
-                                                                   'content_type': 'text'}),
+                                                                   'content_type': 'text'},
+                                               MAIN_MENU={'phrases': ['Меню'], 'content_type': 'text'}),
                       handler_welcome=choose_file_and_send,
                       row_width=3,
                       welcome_msg="Пожалуйста, оцените работу.")

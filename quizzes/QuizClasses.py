@@ -55,7 +55,7 @@ class QuizQuestion:
                 self.variants_one[i] = self.variants_one[i].replace('*', '×')
 
     def create_text_and_buttons(self):
-        self.text = '*' + self.name + '*' + '\n' + '_' + self.question_text + '_' + '\n\n'
+        self.text = '*' + self.name + '*' + '\n' + self.question_text + '\n\n'
         if self.ask_written:
             self.text += '*Please, write an answer by yourself.*' + '\n\n'
             self.default_buttons = None

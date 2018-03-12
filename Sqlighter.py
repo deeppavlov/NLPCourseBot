@@ -79,18 +79,25 @@ class SQLighter:
         return self.cursor.execute("INSERT INTO hw_checking (file_id, user_id, date_started) "
                                    "VALUES (?, ?, strftime('%s','now'))", (file_id, user_id))
 
-    def get_file_ids(self, hw_num, number_of_files, user_id):
-        return self.cursor.execute("SELECT hw.file_id, count(hw_checking.file_id) checks_count "
-                                   "FROM hw "
-                                   "LEFT JOIN hw_checking ON hw.file_id = hw_checking.file_id "
-                                   "WHERE hw.file_id IS NOT NULL "
-                                   "AND hw.hw_num = :hw_num AND hw.user_id != :usr_id "
-                                   "GROUP BY hw.file_id "
-                                   "ORDER BY checks_count "
-                                   "LIMIT :num_files",
-                                   {'hw_num': hw_num,
-                                    'num_files': number_of_files,
-                                    'usr_id': user_id}).fetchall()
+
+    def get_file_ids(self, hw_num, user_id):
+        array = self.cursor.execute(
+            "SELECT hw.file_id, count(hw_checking.file_id) checks "
+            "FROM hw "
+            "LEFT JOIN hw_checking "
+            "ON hw.file_id = hw_checking.file_id "
+            "AND hw_checking.user_id = :usr_id "
+            "WHERE hw.user_id != :usr_id "
+            "AND hw_checking.user_id "
+            "AND hw.file_id IS NOT NULL "
+            "AND hw.hw_num = :hw_num "
+            "AND hw_checking.user_id IS NULL "
+            "GROUP BY hw.file_id ORDER BY checks ASC LIMIT 1",
+            {'hw_num': hw_num, 'usr_id': user_id}).fetchall()
+
+        if len(array) > 0:
+            return array[0][0]
+        return array
 
     def get_latest_quiz_name(self, user_id):
         result = self.cursor.execute("SELECT quizzes.quiz_name "
@@ -103,7 +110,19 @@ class SQLighter:
         if len(result) > 0:
             return result[0][0]
 
-    def get_number_checked_quizzes(self, user_id):
+
+    def get_number_checked_quizzes(self, user_id, quiz_name):
+        result = self.cursor.execute("SELECT count(quizzes_checking.id_quizzes) "
+                                     "FROM quizzes_checking JOIN quizzes ON quizzes.id=quizzes_checking.id_quizzes "
+                                     "WHERE checker_user_id = ? "
+                                     "AND quizzes_checking.is_right IS NOT NULL "
+                                     "AND quizzes.quiz_name = ?"
+                                     , (user_id, quiz_name)).fetchall()
+        if len(result) > 0:
+            return result[0][0]
+        return 0
+
+    def get_number_checked_for_one_quiz(self, user_id, quiz_name):
         result = self.cursor.execute("SELECT count(quizzes_checking.id_quizzes) "
                                      "FROM quizzes_checking WHERE checker_user_id = ? "
                                      "AND is_right IS NOT NULL", (user_id,)).fetchall()
@@ -116,24 +135,27 @@ class SQLighter:
         array = self.cursor.execute(
             "SELECT quizzes.id, quizzes.question_name, quizzes.question_text, quizzes.usr_answer, "
             "count(quizzes_checking.id_quizzes) checks "
-            "FROM quizzes LEFT OUTER JOIN quizzes_checking "
+            "FROM quizzes "
+            "LEFT JOIN quizzes_checking "
             "ON quizzes.id = quizzes_checking.id_quizzes "
             "WHERE quizzes.user_id != ? "
             "AND quizzes.quiz_name = ? "
             "AND quizzes.usr_answer IS NOT NULL "
             # "AND quizzes.usr_answer IS NOT '' "
             "AND quizzes.true_ans IS NULL "
-            # "AND quizzes_checking.checker_user_id != ?"
-            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1", (user_id, quiz_name,)).fetchall()
+            "AND quizzes_checking.checker_user_id IS NULL "
+            "GROUP BY quizzes.id ORDER BY checks ASC LIMIT 1",
+            (user_id, user_id, quiz_name)).fetchall()
         if len(array) > 0:
             return array[0]
         return array
 
     def save_mark(self, user_id, mark):
-        return self.cursor.execute("UPDATE hw_checking SET mark = ?, date_checked=strftime('%s','now') "
+        self.cursor.execute("UPDATE hw_checking SET mark = ?, date_checked=strftime('%s','now') "
                                    "WHERE user_id = ? AND file_id = "
                                    "(SELECT file_id FROM hw_checking "
                                    "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
+        self.connection.commit()
 
     def save_mark_quiz(self, user_id, mark):
         self.cursor.execute("UPDATE quizzes_checking SET is_right = ?, date_checked=strftime('%s','now') "
@@ -276,5 +298,5 @@ class SQLighter:
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    # lol = sql.get_quizzes_stat(' 1')
-    # print(lol)
+    lol = sql.get_number_checked_quizzes('fogside', 'quiz 4')
+    print(lol)

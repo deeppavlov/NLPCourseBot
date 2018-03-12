@@ -15,14 +15,14 @@ wait_usr_interaction = State(name='WAIT_USR_INTERACTION',
 main_menu = State(name='MAIN_MENU',
                   row_width=2,
                   triggers_out=OrderedDict(
-                      {'TAKE_QUIZ': {'phrases': [universal_reply.quiz_enter], 'content_type': 'text'},
-                       'PASS_HW_NUM_SELECT': {'phrases': [universal_reply.hw_enter], 'content_type': 'text'},
-                       'CHECK_QUIZ': {'phrases': [universal_reply.quiz_check], 'content_type': 'text'},
-                       'CHECK_HW_NUM_SELECT': {'phrases': [universal_reply.hw_check], 'content_type': 'text'},
-                       'GET_QUIZ_MARK': {'phrases': [universal_reply.quiz_estimates], 'content_type': 'text'},
-                       'GET_MARK': {'phrases': [universal_reply.hw_estimates], 'content_type': 'text'},
-                       'ASK_QUESTION_START': {'phrases': [universal_reply.ask_question], 'content_type': 'text'},
-                       'ADMIN_MENU': {'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}}),
+                      TAKE_QUIZ={'phrases': [universal_reply.quiz_enter], 'content_type': 'text'},
+                      PASS_HW_NUM_SELECT={'phrases': [universal_reply.hw_enter], 'content_type': 'text'},
+                      CHECK_QUIZ={'phrases': [universal_reply.quiz_check], 'content_type': 'text'},
+                      CHECK_HW_NUM_SELECT={'phrases': [universal_reply.hw_check], 'content_type': 'text'},
+                      QUIZ_MARK_NUM_SELECT={'phrases': [universal_reply.quiz_estimates], 'content_type': 'text'},
+                      GET_MARK={'phrases': [universal_reply.hw_estimates], 'content_type': 'text'},
+                      ASK_QUESTION_START={'phrases': [universal_reply.ask_question], 'content_type': 'text'},
+                      ADMIN_MENU={'phrases': [universal_reply.ADMIN_KEY_PHRASE], 'content_type': 'text'}),
                   hidden_states={'state_name': 'ADMIN_MENU', 'users_file': config.admins},
                   welcome_msg='Выберите доступное действие, пожалуйста')
 
@@ -297,41 +297,55 @@ get_mark = State(name='GET_MARK',
 
 
 # ----------------------------------------------------------------------------
+
+welcome_to_quiz_selection = 'Выберите интересующий вас квиз, чтобы узнать оценку.'
+return_from_quiz_selection = 'Нет проверенных квизов. Возвращайтесь позже.'
+
+quiz_mark_num_select = State(name='QUIZ_MARK_NUM_SELECT',
+                              row_width=2,
+                              triggers_out=OrderedDict(GET_QUIZ_MARK={'phrases': config.quizzes_possible_to_check,
+                                                                      'content_type': 'text'},
+                                                       MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
+                              welcome_msg=welcome_to_quiz_selection if len(config.quizzes_possible_to_check) > 0
+                              else return_from_quiz_selection)
+
+# ----------------------------------------------------------------------------
+
 def get_marks_table_quiz(bot, message, sqldb):
-    num_checked = sqldb.get_number_checked_quizzes(message.chat.username)
+    quiz_name = message.text
+    num_checked = sqldb.get_number_checked_quizzes(message.chat.username, quiz_name)
+
     if num_checked < config.quizzes_need_to_check:
         bot.send_message(chat_id=message.chat.id,
-                         text='🌳🌻 Вы проверили {} квизов. '
+                         text='🌳🌻 Вы проверили {} квизов для {}. '
                               'Необходимо проверить еще {} квизов,'
-                              ' чтобы узнать свою оценку.'.format(num_checked,
-                                                                  config.quizzes_need_to_check - num_checked))
+                              ' чтобы узнать свою оценку по этому квизу.'.format(num_checked, quiz_name,
+                                                                        config.quizzes_need_to_check - num_checked))
         return
-    table = sqldb.get_marks_quiz(user_id=message.chat.username)
-    if table.empty:
+    df = sqldb.get_marks_quiz(user_id=message.chat.username, quiz_name=quiz_name)
+    if df.empty:
         bot.send_message(chat_id=message.chat.id,
-                         text="Пока никто не проверил ваши квизы или вы их вообще не сдавали.\n"
-                              "Возвращайтесь позже.🌳🌻 ")
+                         text="Пока никто не проверил ваш квиз {} или вы его вообще не сдавали.\n"
+                              "Возвращайтесь позже.🌳🌻 ".format(quiz_name))
         return
     finals = defaultdict(list)
-    for quiz, df in table.groupby('Quiz'):
-        if len(df) < 5:
-            continue
-        for i, row in df.iterrows():
-            text = '*' + quiz + '*\n' + '=' * 20 + '\n'
-            text += row.QuestionText + '\n' + '=' * 20 + '\n' + '*Your Answer: *\n' \
-                    + str(row.YourAnswer) + '\n*Score: *' + str(row.Score)
-            if not pd.isna(row.NumChecks):
-                text += '\n*Checked for [{}] times*'.format(row.NumChecks)
-            bot.send_message(text=text, chat_id=message.chat.id, parse_mode='Markdown')
-        mark = '{}/{}'.format(int(sum(df.Score)), len(df))
-        finals['quiz'].append(quiz)
-        finals['mark'].append(mark)
+    for i, row in df.iterrows():
+        text = '*' + quiz_name + '*\n' + '=' * 20 + '\n'
+        text += row.QuestionText + '\n' + '=' * 20 + '\n' + '*Your Answer: *\n' \
+                + str(row.YourAnswer) + '\n*Score: *' + str(row.Score)
+        if not pd.isna(row.NumChecks):
+            text += '\n*Checked for [{}] times*'.format(row.NumChecks)
+        bot.send_message(text=text, chat_id=message.chat.id, parse_mode='Markdown')
+    final_score = int(sum(df.Score)) if (not pd.isna(sum(df.Score))) else 0
+    mark = '{}/{}'.format(final_score, len(df))
+    finals['quiz'].append(quiz_name)
+    finals['mark'].append(mark)
     bot.send_message(text='<code>' + tabulate(finals, headers='keys', tablefmt="fancy_grid") + '</code>',
                      chat_id=message.chat.id, parse_mode='html')
 
 
 get_quiz_mark = State(name='GET_QUIZ_MARK',
-                      triggers_out=OrderedDict({'MAIN_MENU': {'phrases': ['Назад'], 'content_type': 'text'}}),
+                      triggers_out=OrderedDict(QUIZ_MARK_NUM_SELECT={'phrases': ['Назад'], 'content_type': 'text'}),
                       handler_welcome=get_marks_table_quiz,
                       welcome_msg='Good Luck:)')
 
@@ -353,7 +367,9 @@ def choose_file_and_send(bot, message, sqldb):
     # TODO: do smth to fix work with empty hw set;
     # TODO: OH MY GOD! people should check only work that they have done!!!!
 
-    file_ids = sqldb.get_file_ids(hw_num=message.text, number_of_files=3, user_id=message.chat.username)
+
+    file_ids = sqldb.get_file_ids(hw_num=message.text,
+                                  user_id=message.chat.username)
     if len(file_ids) > 0:
         chosen_file = random.choice(file_ids)[0]
         sqldb.write_check_hw_ids(message.chat.username, chosen_file)

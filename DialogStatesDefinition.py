@@ -295,19 +295,19 @@ get_mark = State(name='GET_MARK',
                  handler_welcome=show_marks_table,
                  welcome_msg='Такие дела)')
 
-
 # ----------------------------------------------------------------------------
 
 welcome_to_quiz_selection = 'Выберите интересующий вас квиз, чтобы узнать оценку.'
 return_from_quiz_selection = 'Нет проверенных квизов. Возвращайтесь позже.'
 
 quiz_mark_num_select = State(name='QUIZ_MARK_NUM_SELECT',
-                              row_width=2,
-                              triggers_out=OrderedDict(GET_QUIZ_MARK={'phrases': config.quizzes_possible_to_check,
-                                                                      'content_type': 'text'},
-                                                       MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
-                              welcome_msg=welcome_to_quiz_selection if len(config.quizzes_possible_to_check) > 0
-                              else return_from_quiz_selection)
+                             row_width=2,
+                             triggers_out=OrderedDict(GET_QUIZ_MARK={'phrases': config.quizzes_possible_to_check,
+                                                                     'content_type': 'text'},
+                                                      MAIN_MENU={'phrases': ['Назад'], 'content_type': 'text'}),
+                             welcome_msg=welcome_to_quiz_selection if len(config.quizzes_possible_to_check) > 0
+                             else return_from_quiz_selection)
+
 
 # ----------------------------------------------------------------------------
 
@@ -320,7 +320,7 @@ def get_marks_table_quiz(bot, message, sqldb):
                          text='🌳🌻 Вы проверили {} квизов для {}. '
                               'Необходимо проверить еще {} квизов,'
                               ' чтобы узнать свою оценку по этому квизу.'.format(num_checked, quiz_name,
-                                                                        config.quizzes_need_to_check - num_checked))
+                                                                                 config.quizzes_need_to_check - num_checked))
         return
     df = sqldb.get_marks_quiz(user_id=message.chat.username, quiz_name=quiz_name)
     if df.empty:
@@ -367,7 +367,7 @@ def choose_file_and_send(bot, message, sqldb):
     # TODO: OH MY GOD! people should check only work that they have done!!!!
     hw_num = message.text
     file_id = sqldb.get_file_ids(hw_num=hw_num,
-                                  user_id=message.chat.username)
+                                 user_id=message.chat.username)
     if len(file_id) > 0:
         sqldb.write_check_hw_ids(message.chat.username, file_id)
         bot.send_message(chat_id=message.chat.id,
@@ -376,8 +376,8 @@ def choose_file_and_send(bot, message, sqldb):
         bot.send_message(chat_id=message.chat.id,
                          text='Следующий файл предоставлен вам в качестве примера хорошо выполненного задания.')
         example_file = sqldb.get_example_hw_id(hw_num=hw_num)
-        if len(example_file)>0:
-            bot.send_document(message.chat.id, file_id)
+        if len(example_file) > 0:
+            bot.send_document(message.chat.id, example_file)
         else:
             bot.send_message(chat_id=message.chat.id,
                              text='Ой нет. Я пошутил. Никакого примера на этот раз.')

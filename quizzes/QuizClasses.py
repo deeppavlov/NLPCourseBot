@@ -162,7 +162,7 @@ class QuizQuestion:
         """
         add = str(self.usr_answers[chat_id]) if self.usr_answers[chat_id] else 'None'
         answers = self.text + '\n' + '🍭 Your answer: ' + add
-        bot.send_message(chat_id, answers, parse_mode=self.parse_mode)
+        bot.send_message(chat_id, answers)
 
     def callback_handler(self, bot, message):
         """

@@ -86,9 +86,9 @@ class SQLighter:
             "FROM hw "
             "LEFT JOIN hw_checking "
             "ON hw.file_id = hw_checking.file_id "
-            "AND hw_checking.user_id != :usr_id "
+            "AND hw_checking.user_id = :usr_id "
             "WHERE hw.file_id IS NOT NULL "
-            "AND hw.user_id != :usr_id "
+            "AND hw_checking.user_id is null "
             "AND hw.hw_num = :hw_num "
             "GROUP BY hw.file_id ORDER BY checks ASC LIMIT 1",
             {'hw_num': hw_num, 'usr_id': user_id}).fetchall()
@@ -101,7 +101,7 @@ class SQLighter:
         file_id = self.cursor.execute("SELECT file_id "
                                       "FROM hw_examples "
                                       "WHERE hw_name=?", (hw_num,)).fetchall()
-        if len(file_id)>0:
+        if len(file_id) > 0:
             return file_id[0][0]
         return ''
 
@@ -159,9 +159,9 @@ class SQLighter:
 
     def save_mark(self, user_id, mark):
         self.cursor.execute("UPDATE hw_checking SET mark = ?, date_checked=strftime('%s','now') "
-                                   "WHERE user_id = ? AND file_id = "
-                                   "(SELECT file_id FROM hw_checking "
-                                   "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
+                            "WHERE user_id = ? AND file_id = "
+                            "(SELECT file_id FROM hw_checking "
+                            "WHERE user_id = ? ORDER BY date_started DESC LIMIT 1)", (mark, user_id, user_id))
         self.connection.commit()
 
     def save_mark_quiz(self, user_id, mark):
@@ -213,11 +213,11 @@ class SQLighter:
             "AND quizzes.quiz_name = ? "
             "GROUP BY quizzes.id", (user_id, quiz_name)).fetchall()
 
-        if len(cross_marks) < 1:
+        automarks.extend(cross_marks)
+        if len(automarks) < 4:
             # in case of nothing checked:
             return pd.DataFrame()
 
-        automarks.extend(cross_marks)
         marks = pd.DataFrame(automarks, columns=['Question', 'QuestionText',
                                                  'YourAnswer', 'Score', 'NumChecks'])
         marks.sort_values(by=['Question'], inplace=True)
@@ -308,5 +308,5 @@ class SQLighter:
 
 if __name__ == '__main__':
     sql = SQLighter(config.bd_name)
-    lol = sql.get_example_hw_id('hw6')
-    print(lol)
+    # lol = sql.get_marks_quiz('fogside', 'quiz 5')
+    # print(lol)

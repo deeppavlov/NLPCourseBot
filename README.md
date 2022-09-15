@@ -1,5 +1,5 @@
 # NLPCourseBot
-Telegram-bot for NLP/RL courses at MIPT
+Telegram-bot for NLP/RL courses
 
 ## It can work with quizzes, homeworks and student questions
 
